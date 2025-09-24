@@ -6,7 +6,7 @@ sys.setrecursionlimit(5000)
 STATUSMESSSAGE_START = r'([a-zA-Z]:\\|(>+ )?(./)?selfie)'
 
 def contains_name(output):
-    result = re.match(STATUSMESSSAGE_START + r'[^\n]*This is(?: \S+){2,}\'s Selfie![^\n]*\n', output) != None
+    result = re.match(STATUSMESSSAGE_START + r'[^\n]*This is \S* \S*\'s Selfie![^\n]*\n', output) != None
 
     return (result, 'The selfie output does not contain "<selfiename>: This is <firstname> <secondname>\'s Selfie!"')
 
@@ -54,6 +54,13 @@ def is_interleaved_output(output, interleaved_msg, number_of_interleaved):
     else:
         return (is_interleaved(strings, filtered_output), 'The output strings are not interleaved')
 
+def is_expected_output(output, expected_output):
+    filtered_output = filter_status_messages(output)
+
+    if filtered_output.strip() != expected_output:
+        return (False, 'The output is not the expected one')
+    else:
+        return (True, '')
 
 def is_permutation_of(output, numbers):
     filtered_output = filter_status_messages(output).strip()

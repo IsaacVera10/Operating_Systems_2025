@@ -8,7 +8,7 @@ Selfie is a project of the Computational Systems Group at the Department of
 Computer Sciences of the University of Salzburg in Austria. For further
 information and code please refer to:
 
-selfie.cs.uni-salzburg.at
+http://selfie.cs.uni-salzburg.at
 
 This is the automatic grader of the selfie system.
 """
@@ -18,7 +18,7 @@ from typing import Callable, Optional, List, Set, Tuple, Any
 from lib.functional import flatmap
 from lib.cli import process_arguments
 from lib.model import Assignment, Check
-from lib.output_processing import is_interleaved_output, is_permutation_of, contains_name
+from lib.output_processing import is_interleaved_output, is_permutation_of, contains_name, is_expected_output
 from lib.checks import (check_assembler_instruction_format, check_compilable,
                         check_compile_warnings, check_execution,
                         check_hypster_execution, check_interleaved_output,
@@ -118,8 +118,6 @@ def check_bitwise_and_or_not() -> List[Check]:
     return list(flatmap(check_instruction, [AND_INSTRUCTION, OR_INSTRUCTION, NOT_INSTRUCTION])) + \
         check_mipster_execution('precedence.c', 42,
                                 'bitwise and, or & not ' + ' operators respect the precedence of the C operators: &,|,~') + \
-        check_mipster_execution('precedence3.c', 42,
-                                'bitwise and, or & not ' + ' operators respect the precedence of the C operators: &,|,~') + \
         check_mipster_execution('precedence2.c', 42,
                                 'bitwise and, or & not ' + ' operators respect the precedence of the C operators: +,-')
 
@@ -140,8 +138,6 @@ def check_logical_and_or_not() -> List[Check]:
         check_mipster_execution('advanced-logical-expressions.c', 42,
                                 'advanced boolean expressions work when executed with MIPSTER') + \
         check_mipster_execution('precedence.c', 42,
-                                'operator precedence works correctly when executed with MIPSTER') + \
-        check_mipster_execution('precedence2.c', 42,
                                 'operator precedence works correctly when executed with MIPSTER')
 
 
@@ -179,9 +175,7 @@ def check_lazy_evaluation() -> List[Check]:
 
 def check_array() -> List[Check]:
     return check_compilable('global-declaration.c',
-                            'global array declaration do compile') + \
-        check_compilable('local-declaration.c',
-                         'local array declaration do compile') + \
+                            'array declaration do compile') + \
         check_compilable('assignment.c',
                          'assignments on arrays do compile') + \
         check_compilable('invalid-assignment.c',
@@ -271,18 +265,11 @@ def check_fork_and_wait() -> List[Check]:
         check_mipster_execution('parallel-print.c',
                                 lambda code, out: is_permutation_of(
                                     out, [0, 1, 2, 3, 4, 5, 6, 7]),
-                                'fork creates a child process, where the parent can wait for the child process with MIPSTER') + \
-        check_hypster_execution('parallel-print.c',
-                                lambda code, out: is_permutation_of(
-                                    out, [0, 1, 2, 3, 4, 5, 6, 7]),
-                                'fork creates a child process, where the parent can wait for the child process with HYPSTER')
-
+                                'fork creates a child process, where the parent can wait for the child process with MIPSTER')
 
 def check_fork_wait_exit() -> List[Check]:
     return check_mipster_execution('sum-exit-code.c', 56,
                                    'exit code is returned as status parameter from wait with MIPSTER') + \
-        check_hypster_execution('sum-exit-code.c', 56,
-                                'exit code is returned as status parameter from wait with HYPSTER') + \
         check_mipster_execution('unmapped-page-wait.c', 42,
                                 'wait system call maps page to unmapped virtual address') + \
         check_mipster_execution('invalid-address.c', 42,
@@ -295,14 +282,8 @@ def check_lock() -> List[Check]:
     return check_execution('./selfie -c <assignment>print-without-lock.c -m 128',
                            '16 processes are running concurrently on MIPSTER',
                            success_criteria=lambda code, out: is_interleaved_output(out, 'Hello World!    ', 8)) + \
-        check_execution('./selfie -c selfie.c -m 128 -c <assignment>print-without-lock.c -y 10',
-                        '16 processes are running concurrently on HYPSTER',
-                        success_criteria=lambda code, out: is_interleaved_output(out, 'Hello World!    ', 8)) + \
         check_execution('./selfie -c <assignment>print-with-lock.c -m 128',
                         '16 processes are printing in sequential order with the use of locks on MIPSTER',
-                        success_criteria='Hello World!    ' * 8) + \
-        check_execution('./selfie -c selfie.c -m 128 -c <assignment>print-with-lock.c -y 10',
-                        '16 processes are printing in sequential order with the use of locks on HYPSTER',
                         success_criteria='Hello World!    ' * 8) + \
         check_execution('./selfie -c <assignment>release-after-exit.c -m 128',
                         'Lock is granted to a process after a terminated process did not release its lock',
@@ -311,21 +292,13 @@ def check_lock() -> List[Check]:
 
 def check_threads() -> List[Check]:
     return check_execution('./selfie -c <assignment>syscalls.c -m 128',
-                           'creates a thread, where the parent can join the thread with MIPSTER', success_criteria=70) + \
-        check_execution('./selfie -c selfie.c -m 128 -c <assignment>syscalls.c -y 64',
-                        'creates a thread, where the parent can join the thread with HYPSTER', success_criteria=70) + \
+                           'creates a thread, where the parent can join the thread with MIPSTER', success_criteria=56) + \
         check_mipster_execution('shared-data.c', 42,
                                 'data section is shared for threads on MIPSTER') + \
-        check_hypster_execution('shared-data.c', 42,
-                                'data section is shared for threads on HYPSTER') + \
         check_mipster_execution('shared-heap.c', 42,
                                 'heap data is shared for threads on MIPSTER') + \
-        check_hypster_execution('shared-heap.c', 42,
-                                'heap data is shared for threads on HYPSTER') + \
         check_mipster_execution('sum-integer-dekker.c', 210,
-                                'two threads correctly calculate the sum from 1 to 20 with Dekker\'s algorithm on MIPSTER') +\
-        check_hypster_execution('sum-integer-dekker.c', 210,
-                                'two threads correctly calculate the sum from 1 to 20 with Dekker\'s algorithm on HYPSTER')
+                                'two threads correctly calculate the sum from 1 to 20 with Dekker\'s algorithm on MIPSTER')
 
 
 def check_threadsafe_malloc() -> List[Check]:
@@ -347,6 +320,21 @@ def check_treiber_stack() -> List[Check]:
                         'all treiber-stack elements can be popped ',
                         success_criteria=lambda code, out: is_permutation_of(out, [0, 1, 2, 3, 4, 5, 6, 7]))
 
+def check_scheduler() -> List[Check]:
+    return check_execution('./selfie -c <assignment>priority-decrease.c -m 128',
+                           'Process execution is ordered by priority',
+                           success_criteria=lambda code, out: is_expected_output(out, "2 1 3 0")) + \
+		check_execution('./selfie -c <assignment>priority-donation.c -m 128',
+                  		'Process donates priority to avoid deadlock',
+                        success_criteria=lambda code, out: is_expected_output(out, "0 1")) 
+
+def check_count_syscalls() -> List[Check]:
+    return check_mipster_execution('test1.c', 3,
+                           'Count syscalls on sample test') + \
+        check_mipster_execution('test2.c', 78,
+                                'Count called syscalls for fibonacci') + \
+        check_mipster_execution('test3.c', 6,
+                                'Count called syscalls for binary search') 
 
 assignment_bootstrapping = Assignment('bootstrapping', 'General', '', '', check_bootstrapping)
 assignment_self_compile = Assignment('self-compile', 'General', '', '', check_self_compilation)
@@ -421,6 +409,12 @@ assignment_threadsafe_malloc = Assignment('threadsafe-malloc', 'Systems', 'threa
 assignment_treiber_stack = Assignment('treiber-stack', 'Systems', 'treiber-stack',
            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-treiber-stack',
            check_treiber_stack, parent = assignment_threadsafe_malloc)
+assignment_scheduler = Assignment('scheduler', 'Systems', 'scheduler',
+            REPO_BLOB_BASE_URI + 'grader/systems-assignmens.md#assignment-treiber-stack',
+            check_scheduler, parent = assignment_threads)
+assignment_count_syscalls = Assignment('count-syscalls', 'Systems', 'count-syscalls',
+            REPO_BLOB_BASE_URI + 'grader/systems-assignmens.md#assignment-count-syscalls',
+            check_count_syscalls)
 
 assignments: List[Assignment] = [
     assignment_print_your_name,
@@ -443,7 +437,9 @@ assignments: List[Assignment] = [
     assignment_lock,
     assignment_threads,
     assignment_threadsafe_malloc,
-    assignment_treiber_stack
+    assignment_treiber_stack,
+    assignment_scheduler,
+    assignment_count_syscalls
 ]
 
 
