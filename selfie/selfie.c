@@ -2583,6 +2583,8 @@ void init_selfie(uint64_t argc, uint64_t *argv)
   selfie_argv = argv;
 
   selfie_name = get_argument();
+
+  printf("%s: This is Isaac Vera's Selfie!\n", selfie_name); //LAB_0
 }
 
 void init_system()
