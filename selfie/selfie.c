@@ -1293,6 +1293,9 @@ void implement_read(uint64_t *context);
 void emit_write();
 void implement_write(uint64_t *context);
 
+void emit_dummy_syscall(); // dummy_syscall
+void implement_dummy_syscall(uint64_t *context); // dummy_syscall
+
 void emit_count_syscalls(); // count_syscall
 void implement_count_syscalls(uint64_t *context); // count_syscall
 
@@ -1319,8 +1322,8 @@ uint64_t SYSCALL_READ = 63;
 uint64_t SYSCALL_WRITE = 64;
 uint64_t SYSCALL_OPENAT = 56;
 uint64_t SYSCALL_BRK = 214;
-uint64_t SYSCALL_COUNT_SYSCALLS = 1; // count_syscall
-uint64_t contador_sycalls = 0; // count_syscall
+uint64_t SYSCALL_DUMMY = 1;           // dummy_syscall
+uint64_t SYSCALL_COUNT_SYSCALLS = 2; // count_syscall
 
 /* DIRFD_AT_FDCWD corresponds to AT_FDCWD in fcntl.h and
    is passed as first argument of the openat system call
@@ -6852,6 +6855,7 @@ void selfie_compile()
   emit_read();
   emit_write();
   emit_open();
+  emit_dummy_syscall(); // dummy_syscall
   emit_count_syscalls(); // count_syscall
 
   emit_malloc();
@@ -8486,14 +8490,51 @@ void emit_open()
   emit_jalr(REG_ZR, REG_RA, 0);
 }
 
+void emit_dummy_syscall(){ // dummy_syscall
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("dummy_syscall"),
+                            0, PROCEDURE, UINT64_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // fd
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_DUMMY);
+  emit_ecall();
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_dummy_syscall(uint64_t *context){ // dummy_syscall
+  // parameter
+  uint64_t fd;
+
+  if (debug_syscalls)
+  {
+    printf("(dummy_syscall): ");
+    print_register_value(REG_A0);
+    printf(" |- ");
+    print_register_value(REG_A0);
+  }
+
+  fd = *(get_regs(context) + REG_A0);
+
+  *(get_regs(context) + REG_A0) = fd + 2025; // echo the parameter back
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+
+  if (debug_syscalls)
+  {
+    printf(" -> ");
+    print_register_value(REG_A0);
+    println();
+  }
+}
+
 void emit_count_syscalls(){ // count_syscall
   create_symbol_table_entry(GLOBAL_TABLE, string_copy("count_syscalls"),
                             0, PROCEDURE, UINT64_T, 0, code_size);
 
   emit_addi(REG_A7, REG_ZR, SYSCALL_COUNT_SYSCALLS);
-
   emit_ecall();
-
   emit_jalr(REG_ZR, REG_RA, 0);
 }
 void implement_count_syscalls(uint64_t *context){ // count_syscall
@@ -10938,26 +10979,24 @@ void do_ecall()
   else
   {
     read_register(REG_A0);
-      if(a7 == SYSCALL_COUNT_SYSCALLS){// count_syscall
-        write_register(REG_A0);
-      }else{
-        if (*(registers + REG_A7) != SYSCALL_EXIT)
-        {
-          if (*(registers + REG_A7) != SYSCALL_BRK)
-          {
+    if (a7 != SYSCALL_EXIT)
+    {
+      if (a7 != SYSCALL_COUNT_SYSCALLS){
+        if (a7 != SYSCALL_DUMMY){
+          if (a7 != SYSCALL_BRK){
+
             read_register(REG_A1);
             read_register(REG_A2);
 
-            if (*(registers + REG_A7) == SYSCALL_OPENAT)
+            if (a7 == SYSCALL_OPENAT)
               read_register(REG_A3);
           }
-
-          write_register(REG_A0);
         }
       }
-    
+      write_register(REG_A0);
+    }
     // all system calls other than switch are handled by exception
-    throw_exception(EXCEPTION_SYSCALL, *(registers + REG_A7));
+    throw_exception(EXCEPTION_SYSCALL, a7);
   }
 }
 
@@ -12718,7 +12757,6 @@ void up_load_arguments(uint64_t *context, uint64_t argc, uint64_t *argv)
 uint64_t handle_system_call(uint64_t *context)
 {
   uint64_t a7;
-  contador_sycalls = contador_sycalls + 1;
 
   set_exception(context, EXCEPTION_NOEXCEPTION);
 
@@ -12740,6 +12778,8 @@ uint64_t handle_system_call(uint64_t *context)
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
+  else if (a7 == SYSCALL_DUMMY)  // dummy_syscall
+    implement_dummy_syscall(context);
   else if (a7 == SYSCALL_COUNT_SYSCALLS) // count_syscall
     implement_count_syscalls(context);
   else if (a7 == SYSCALL_EXIT)
