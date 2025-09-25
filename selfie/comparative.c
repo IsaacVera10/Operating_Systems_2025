@@ -106,8 +106,6 @@ uint64_t open(char *filename, uint64_t flags, ...);
 // selfie bootstraps void* to uint64_t* and unsigned to uint64_t!
 void *malloc(unsigned long);
 
-
-
 // selfie bootstraps the following *printf procedures
 int printf(const char *format, ...);
 int sprintf(char *str, const char *format, ...);
@@ -513,41 +511,41 @@ void init_scanner()
 {
   SYMBOLS = smalloc((SYM_CONST + 1) * sizeof(uint64_t *));
 
-  *(SYMBOLS + SYM_INTEGER) = (uint64_t) "integer";
-  *(SYMBOLS + SYM_CHARACTER) = (uint64_t) "character";
-  *(SYMBOLS + SYM_STRING) = (uint64_t) "string";
-  *(SYMBOLS + SYM_IDENTIFIER) = (uint64_t) "identifier";
-  *(SYMBOLS + SYM_UINT64) = (uint64_t) "uint64_t";
-  *(SYMBOLS + SYM_IF) = (uint64_t) "if";
-  *(SYMBOLS + SYM_ELSE) = (uint64_t) "else";
-  *(SYMBOLS + SYM_VOID) = (uint64_t) "void";
-  *(SYMBOLS + SYM_RETURN) = (uint64_t) "return";
-  *(SYMBOLS + SYM_WHILE) = (uint64_t) "while";
-  *(SYMBOLS + SYM_SIZEOF) = (uint64_t) "sizeof";
-  *(SYMBOLS + SYM_COMMA) = (uint64_t) ",";
-  *(SYMBOLS + SYM_SEMICOLON) = (uint64_t) ";";
-  *(SYMBOLS + SYM_LPARENTHESIS) = (uint64_t) "(";
-  *(SYMBOLS + SYM_RPARENTHESIS) = (uint64_t) ")";
-  *(SYMBOLS + SYM_LBRACE) = (uint64_t) "{";
-  *(SYMBOLS + SYM_RBRACE) = (uint64_t) "}";
-  *(SYMBOLS + SYM_PLUS) = (uint64_t) "+";
-  *(SYMBOLS + SYM_MINUS) = (uint64_t) "-";
-  *(SYMBOLS + SYM_ASTERISK) = (uint64_t) "*";
-  *(SYMBOLS + SYM_DIVISION) = (uint64_t) "/";
-  *(SYMBOLS + SYM_REMAINDER) = (uint64_t) "%";
-  *(SYMBOLS + SYM_ASSIGN) = (uint64_t) "=";
-  *(SYMBOLS + SYM_EQUALITY) = (uint64_t) "==";
-  *(SYMBOLS + SYM_NOTEQ) = (uint64_t) "!=";
-  *(SYMBOLS + SYM_LT) = (uint64_t) "<";
-  *(SYMBOLS + SYM_LEQ) = (uint64_t) "<=";
-  *(SYMBOLS + SYM_GT) = (uint64_t) ">";
-  *(SYMBOLS + SYM_GEQ) = (uint64_t) ">=";
-  *(SYMBOLS + SYM_ELLIPSIS) = (uint64_t) "...";
+  *(SYMBOLS + SYM_INTEGER) = (uint64_t)"integer";
+  *(SYMBOLS + SYM_CHARACTER) = (uint64_t)"character";
+  *(SYMBOLS + SYM_STRING) = (uint64_t)"string";
+  *(SYMBOLS + SYM_IDENTIFIER) = (uint64_t)"identifier";
+  *(SYMBOLS + SYM_UINT64) = (uint64_t)"uint64_t";
+  *(SYMBOLS + SYM_IF) = (uint64_t)"if";
+  *(SYMBOLS + SYM_ELSE) = (uint64_t)"else";
+  *(SYMBOLS + SYM_VOID) = (uint64_t)"void";
+  *(SYMBOLS + SYM_RETURN) = (uint64_t)"return";
+  *(SYMBOLS + SYM_WHILE) = (uint64_t)"while";
+  *(SYMBOLS + SYM_SIZEOF) = (uint64_t)"sizeof";
+  *(SYMBOLS + SYM_COMMA) = (uint64_t)",";
+  *(SYMBOLS + SYM_SEMICOLON) = (uint64_t)";";
+  *(SYMBOLS + SYM_LPARENTHESIS) = (uint64_t)"(";
+  *(SYMBOLS + SYM_RPARENTHESIS) = (uint64_t)")";
+  *(SYMBOLS + SYM_LBRACE) = (uint64_t)"{";
+  *(SYMBOLS + SYM_RBRACE) = (uint64_t)"}";
+  *(SYMBOLS + SYM_PLUS) = (uint64_t)"+";
+  *(SYMBOLS + SYM_MINUS) = (uint64_t)"-";
+  *(SYMBOLS + SYM_ASTERISK) = (uint64_t)"*";
+  *(SYMBOLS + SYM_DIVISION) = (uint64_t)"/";
+  *(SYMBOLS + SYM_REMAINDER) = (uint64_t)"%";
+  *(SYMBOLS + SYM_ASSIGN) = (uint64_t)"=";
+  *(SYMBOLS + SYM_EQUALITY) = (uint64_t)"==";
+  *(SYMBOLS + SYM_NOTEQ) = (uint64_t)"!=";
+  *(SYMBOLS + SYM_LT) = (uint64_t)"<";
+  *(SYMBOLS + SYM_LEQ) = (uint64_t)"<=";
+  *(SYMBOLS + SYM_GT) = (uint64_t)">";
+  *(SYMBOLS + SYM_GEQ) = (uint64_t)">=";
+  *(SYMBOLS + SYM_ELLIPSIS) = (uint64_t)"...";
 
-  *(SYMBOLS + SYM_INT) = (uint64_t) "int";
-  *(SYMBOLS + SYM_CHAR) = (uint64_t) "char";
-  *(SYMBOLS + SYM_UNSIGNED) = (uint64_t) "unsigned";
-  *(SYMBOLS + SYM_CONST) = (uint64_t) "const";
+  *(SYMBOLS + SYM_INT) = (uint64_t)"int";
+  *(SYMBOLS + SYM_CHAR) = (uint64_t)"char";
+  *(SYMBOLS + SYM_UNSIGNED) = (uint64_t)"unsigned";
+  *(SYMBOLS + SYM_CONST) = (uint64_t)"const";
 
   character = CHAR_EOF;
   symbol = SYM_EOF;
@@ -934,38 +932,38 @@ void init_register()
 {
   REGISTERS = smalloc(NUMBEROFREGISTERS * sizeof(uint64_t *));
 
-  *(REGISTERS + REG_ZR) = (uint64_t) "zero";
-  *(REGISTERS + REG_RA) = (uint64_t) "ra";
-  *(REGISTERS + REG_SP) = (uint64_t) "sp";
-  *(REGISTERS + REG_GP) = (uint64_t) "gp";
-  *(REGISTERS + REG_TP) = (uint64_t) "tp";
-  *(REGISTERS + REG_T0) = (uint64_t) "t0";
-  *(REGISTERS + REG_T1) = (uint64_t) "t1";
-  *(REGISTERS + REG_T2) = (uint64_t) "t2";
-  *(REGISTERS + REG_S0) = (uint64_t) "s0"; // used to be fp
-  *(REGISTERS + REG_S1) = (uint64_t) "s1";
-  *(REGISTERS + REG_A0) = (uint64_t) "a0";
-  *(REGISTERS + REG_A1) = (uint64_t) "a1";
-  *(REGISTERS + REG_A2) = (uint64_t) "a2";
-  *(REGISTERS + REG_A3) = (uint64_t) "a3";
-  *(REGISTERS + REG_A4) = (uint64_t) "a4";
-  *(REGISTERS + REG_A5) = (uint64_t) "a5";
-  *(REGISTERS + REG_A6) = (uint64_t) "a6";
-  *(REGISTERS + REG_A7) = (uint64_t) "a7";
-  *(REGISTERS + REG_S2) = (uint64_t) "s2";
-  *(REGISTERS + REG_S3) = (uint64_t) "s3";
-  *(REGISTERS + REG_S4) = (uint64_t) "s4";
-  *(REGISTERS + REG_S5) = (uint64_t) "s5";
-  *(REGISTERS + REG_S6) = (uint64_t) "s6";
-  *(REGISTERS + REG_S7) = (uint64_t) "s7";
-  *(REGISTERS + REG_S8) = (uint64_t) "s8";
-  *(REGISTERS + REG_S9) = (uint64_t) "s9";
-  *(REGISTERS + REG_S10) = (uint64_t) "s10";
-  *(REGISTERS + REG_S11) = (uint64_t) "s11";
-  *(REGISTERS + REG_T3) = (uint64_t) "t3";
-  *(REGISTERS + REG_T4) = (uint64_t) "t4";
-  *(REGISTERS + REG_T5) = (uint64_t) "t5";
-  *(REGISTERS + REG_T6) = (uint64_t) "t6";
+  *(REGISTERS + REG_ZR) = (uint64_t)"zero";
+  *(REGISTERS + REG_RA) = (uint64_t)"ra";
+  *(REGISTERS + REG_SP) = (uint64_t)"sp";
+  *(REGISTERS + REG_GP) = (uint64_t)"gp";
+  *(REGISTERS + REG_TP) = (uint64_t)"tp";
+  *(REGISTERS + REG_T0) = (uint64_t)"t0";
+  *(REGISTERS + REG_T1) = (uint64_t)"t1";
+  *(REGISTERS + REG_T2) = (uint64_t)"t2";
+  *(REGISTERS + REG_S0) = (uint64_t)"s0"; // used to be fp
+  *(REGISTERS + REG_S1) = (uint64_t)"s1";
+  *(REGISTERS + REG_A0) = (uint64_t)"a0";
+  *(REGISTERS + REG_A1) = (uint64_t)"a1";
+  *(REGISTERS + REG_A2) = (uint64_t)"a2";
+  *(REGISTERS + REG_A3) = (uint64_t)"a3";
+  *(REGISTERS + REG_A4) = (uint64_t)"a4";
+  *(REGISTERS + REG_A5) = (uint64_t)"a5";
+  *(REGISTERS + REG_A6) = (uint64_t)"a6";
+  *(REGISTERS + REG_A7) = (uint64_t)"a7";
+  *(REGISTERS + REG_S2) = (uint64_t)"s2";
+  *(REGISTERS + REG_S3) = (uint64_t)"s3";
+  *(REGISTERS + REG_S4) = (uint64_t)"s4";
+  *(REGISTERS + REG_S5) = (uint64_t)"s5";
+  *(REGISTERS + REG_S6) = (uint64_t)"s6";
+  *(REGISTERS + REG_S7) = (uint64_t)"s7";
+  *(REGISTERS + REG_S8) = (uint64_t)"s8";
+  *(REGISTERS + REG_S9) = (uint64_t)"s9";
+  *(REGISTERS + REG_S10) = (uint64_t)"s10";
+  *(REGISTERS + REG_S11) = (uint64_t)"s11";
+  *(REGISTERS + REG_T3) = (uint64_t)"t3";
+  *(REGISTERS + REG_T4) = (uint64_t)"t4";
+  *(REGISTERS + REG_T5) = (uint64_t)"t5";
+  *(REGISTERS + REG_T6) = (uint64_t)"t6";
 }
 
 // -----------------------------------------------------------------
@@ -1293,12 +1291,6 @@ void implement_read(uint64_t *context);
 void emit_write();
 void implement_write(uint64_t *context);
 
-void emit_dummy_syscall(); // dummy_syscall
-void implement_dummy_syscall(uint64_t *context); // dummy_syscall
-
-void emit_count_syscalls(); // count_syscall
-void implement_count_syscalls(uint64_t *context); // count_syscall
-
 void emit_open();
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s);
 void implement_openat(uint64_t *context);
@@ -1307,6 +1299,17 @@ void emit_malloc();
 uint64_t try_brk(uint64_t *context, uint64_t new_program_break);
 void implement_brk(uint64_t *context);
 
+// EMIT_DUMMY_SYSCALL()
+void emit_dummy_syscall();
+void implement_dummy_syscall(uint64_t *context);
+
+// NUEVO EJERCICIO DE FORK
+void emit_getppid();
+void implement_getppid(uint64_t *context);
+
+// NUEVO EJERCICIO DE PRINT_NAME
+void emit_print_name_syscall();
+void implement_print_name_syscall(uint64_t *context);
 
 uint64_t is_boot_level_zero();
 
@@ -1322,8 +1325,12 @@ uint64_t SYSCALL_READ = 63;
 uint64_t SYSCALL_WRITE = 64;
 uint64_t SYSCALL_OPENAT = 56;
 uint64_t SYSCALL_BRK = 214;
-uint64_t SYSCALL_DUMMY = 1;           // dummy_syscall
-uint64_t SYSCALL_COUNT_SYSCALLS = 2; // count_syscall
+// nuevo para dummy syscall
+uint64_t SYSCALL_DUMMY_SYSCALL = 01; // nuevo ID para nuestra syscall
+// NUEVO EJERCICIO
+uint64_t SYSCALL_GETPPID = 215;
+// EJERCICIO PRINTNAME
+uint64_t SYSCALL_PRINT_NAME_SYSCALL = 216;
 
 /* DIRFD_AT_FDCWD corresponds to AT_FDCWD in fcntl.h and
    is passed as first argument of the openat system call
@@ -1866,34 +1873,34 @@ void init_disassembler()
 {
   MNEMONICS = smalloc((ECALL + 1) * sizeof(uint64_t *));
 
-  *(MNEMONICS + LUI) = (uint64_t) "lui";
-  *(MNEMONICS + ADDI) = (uint64_t) "addi";
-  *(MNEMONICS + ADD) = (uint64_t) "add";
-  *(MNEMONICS + SUB) = (uint64_t) "sub";
-  *(MNEMONICS + MUL) = (uint64_t) "mul";
-  *(MNEMONICS + DIVU) = (uint64_t) "divu";
-  *(MNEMONICS + REMU) = (uint64_t) "remu";
-  *(MNEMONICS + SLTU) = (uint64_t) "sltu";
+  *(MNEMONICS + LUI) = (uint64_t)"lui";
+  *(MNEMONICS + ADDI) = (uint64_t)"addi";
+  *(MNEMONICS + ADD) = (uint64_t)"add";
+  *(MNEMONICS + SUB) = (uint64_t)"sub";
+  *(MNEMONICS + MUL) = (uint64_t)"mul";
+  *(MNEMONICS + DIVU) = (uint64_t)"divu";
+  *(MNEMONICS + REMU) = (uint64_t)"remu";
+  *(MNEMONICS + SLTU) = (uint64_t)"sltu";
 
   reset_disassembler();
 
-  *(MNEMONICS + BEQ) = (uint64_t) "beq";
-  *(MNEMONICS + JAL) = (uint64_t) "jal";
-  *(MNEMONICS + JALR) = (uint64_t) "jalr";
-  *(MNEMONICS + ECALL) = (uint64_t) "ecall";
+  *(MNEMONICS + BEQ) = (uint64_t)"beq";
+  *(MNEMONICS + JAL) = (uint64_t)"jal";
+  *(MNEMONICS + JALR) = (uint64_t)"jalr";
+  *(MNEMONICS + ECALL) = (uint64_t)"ecall";
 }
 
 void reset_disassembler()
 {
   if (IS64BITTARGET)
   {
-    *(MNEMONICS + LOAD) = (uint64_t) "ld";
-    *(MNEMONICS + STORE) = (uint64_t) "sd";
+    *(MNEMONICS + LOAD) = (uint64_t)"ld";
+    *(MNEMONICS + STORE) = (uint64_t)"sd";
   }
   else
   {
-    *(MNEMONICS + LOAD) = (uint64_t) "lw";
-    *(MNEMONICS + STORE) = (uint64_t) "sw";
+    *(MNEMONICS + LOAD) = (uint64_t)"lw";
+    *(MNEMONICS + STORE) = (uint64_t)"sw";
   }
 }
 
@@ -2097,16 +2104,16 @@ void init_interpreter()
 {
   EXCEPTIONS = smalloc((EXCEPTION_INTEGEROVERFLOW + 1) * sizeof(uint64_t *));
 
-  *(EXCEPTIONS + EXCEPTION_NOEXCEPTION) = (uint64_t) "no exception";
-  *(EXCEPTIONS + EXCEPTION_PAGEFAULT) = (uint64_t) "page fault";
-  *(EXCEPTIONS + EXCEPTION_SEGMENTATIONFAULT) = (uint64_t) "segmentation fault";
-  *(EXCEPTIONS + EXCEPTION_SYSCALL) = (uint64_t) "syscall";
-  *(EXCEPTIONS + EXCEPTION_TIMER) = (uint64_t) "timer interrupt";
-  *(EXCEPTIONS + EXCEPTION_DIVISIONBYZERO) = (uint64_t) "division by zero";
-  *(EXCEPTIONS + EXCEPTION_INVALIDADDRESS) = (uint64_t) "invalid address";
-  *(EXCEPTIONS + EXCEPTION_UNKNOWNINSTRUCTION) = (uint64_t) "unknown instruction";
-  *(EXCEPTIONS + EXCEPTION_UNINITIALIZEDREGISTER) = (uint64_t) "uninitialized register";
-  *(EXCEPTIONS + EXCEPTION_INTEGEROVERFLOW) = (uint64_t) "integer overflow";
+  *(EXCEPTIONS + EXCEPTION_NOEXCEPTION) = (uint64_t)"no exception";
+  *(EXCEPTIONS + EXCEPTION_PAGEFAULT) = (uint64_t)"page fault";
+  *(EXCEPTIONS + EXCEPTION_SEGMENTATIONFAULT) = (uint64_t)"segmentation fault";
+  *(EXCEPTIONS + EXCEPTION_SYSCALL) = (uint64_t)"syscall";
+  *(EXCEPTIONS + EXCEPTION_TIMER) = (uint64_t)"timer interrupt";
+  *(EXCEPTIONS + EXCEPTION_DIVISIONBYZERO) = (uint64_t)"division by zero";
+  *(EXCEPTIONS + EXCEPTION_INVALIDADDRESS) = (uint64_t)"invalid address";
+  *(EXCEPTIONS + EXCEPTION_UNKNOWNINSTRUCTION) = (uint64_t)"unknown instruction";
+  *(EXCEPTIONS + EXCEPTION_UNINITIALIZEDREGISTER) = (uint64_t)"uninitialized register";
+  *(EXCEPTIONS + EXCEPTION_INTEGEROVERFLOW) = (uint64_t)"integer overflow";
 }
 
 void reset_interpreter()
@@ -2517,11 +2524,11 @@ void init_kernel()
 {
   MACHINES = smalloc((MIXTER + 1) * sizeof(uint64_t *));
 
-  *(MACHINES + MIPSTER) = (uint64_t) "mipster";
-  *(MACHINES + HYPSTER) = (uint64_t) "hypster";
-  *(MACHINES + MINSTER) = (uint64_t) "minster";
-  *(MACHINES + MOBSTER) = (uint64_t) "mobster";
-  *(MACHINES + MIXTER) = (uint64_t) "mixter";
+  *(MACHINES + MIPSTER) = (uint64_t)"mipster";
+  *(MACHINES + HYPSTER) = (uint64_t)"hypster";
+  *(MACHINES + MINSTER) = (uint64_t)"minster";
+  *(MACHINES + MOBSTER) = (uint64_t)"mobster";
+  *(MACHINES + MIXTER) = (uint64_t)"mixter";
 }
 
 // -----------------------------------------------------------------
@@ -2586,8 +2593,6 @@ void init_selfie(uint64_t argc, uint64_t *argv)
   selfie_argv = argv;
 
   selfie_name = get_argument();
-
-  printf("%s: This is Isaac Vera's Selfie!\n", selfie_name); //LAB_0
 }
 
 void init_system()
@@ -6855,8 +6860,10 @@ void selfie_compile()
   emit_read();
   emit_write();
   emit_open();
-  emit_dummy_syscall(); // dummy_syscall
-  emit_count_syscalls(); // count_syscall
+  emit_dummy_syscall();
+
+  // para llamar a print_name
+  emit_print_name_syscall();
 
   emit_malloc();
 
@@ -8490,74 +8497,6 @@ void emit_open()
   emit_jalr(REG_ZR, REG_RA, 0);
 }
 
-void emit_dummy_syscall(){ // dummy_syscall
-  create_symbol_table_entry(GLOBAL_TABLE, string_copy("dummy_syscall"),
-                            0, PROCEDURE, UINT64_T, 1, code_size);
-
-  emit_load(REG_A0, REG_SP, 0); // fd
-  emit_addi(REG_SP, REG_SP, WORDSIZE);
-
-  emit_addi(REG_A7, REG_ZR, SYSCALL_DUMMY);
-  emit_ecall();
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-
-void implement_dummy_syscall(uint64_t *context){ // dummy_syscall
-  // parameter
-  uint64_t fd;
-
-  if (debug_syscalls)
-  {
-    printf("(dummy_syscall): ");
-    print_register_value(REG_A0);
-    printf(" |- ");
-    print_register_value(REG_A0);
-  }
-
-  fd = *(get_regs(context) + REG_A0);
-
-  *(get_regs(context) + REG_A0) = fd + 2025; // echo the parameter back
-
-  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-
-
-  if (debug_syscalls)
-  {
-    printf(" -> ");
-    print_register_value(REG_A0);
-    println();
-  }
-}
-
-void emit_count_syscalls(){ // count_syscall
-  create_symbol_table_entry(GLOBAL_TABLE, string_copy("count_syscalls"),
-                            0, PROCEDURE, UINT64_T, 0, code_size);
-
-  emit_addi(REG_A7, REG_ZR, SYSCALL_COUNT_SYSCALLS);
-  emit_ecall();
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-void implement_count_syscalls(uint64_t *context){ // count_syscall
-  if (debug_syscalls)
-  {
-    printf("(count_syscalls): ");
-    printf(" |- ");
-    print_register_value(REG_A0);
-  }
-
-  *(get_regs(context) + REG_A0) = ic_ecall; //ic_ecall ==
-
-  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-
-  if (debug_syscalls)
-  {
-    printf(" -> ");
-    print_register_value(REG_A0);
-    println();
-  }
-}
-
-
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s)
 {
   return copy_buffer(context, vstring, (uint64_t *)s, 0, 0);
@@ -8763,6 +8702,106 @@ void implement_brk(uint64_t *context)
   }
 }
 
+void emit_dummy_syscall()
+{
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("dummy_syscall"), 0, PROCEDURE, UINT64_T, 1, code_size);
+  emit_load(REG_A0, REG_SP, 0); // value
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_DUMMY_SYSCALL);
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+void implement_dummy_syscall(uint64_t *context)
+{
+  // parametros
+  uint64_t value;
+  if (debug_syscalls)
+  {
+    printf("(dummy_syscall): ");
+    print_register_hexadecimal(REG_A0);
+    printf(" |- ");
+    print_register_hexadecimal(REG_A0);
+  }
+  // recibirá el registro A0(donde está el valor que pasamos en la funcion) y le agregaremos 2025
+  value = *(get_regs(context) + REG_A0) + 2025;
+  // ESCRIBIR EN EL REGISTRO CERO
+  *(get_regs(context) + REG_A0) = value;
+  // AUMENTAR EL PROGRAM COUNTER PARA SALIR DE BUCLE
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+  if (debug_syscalls)
+  {
+    printf(" -> ");
+    print_register_hexadecimal(REG_A0);
+    println();
+  }
+}
+
+void emit_print_name_syscall()
+{
+
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("print_name"), 0, PROCEDURE, UINT64_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // name
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_lo
+
+  /*create_symbol_table_entry(GLOBAL_TABLE, string_copy("write"),
+                            0, PROCEDURE, UINT64_T, 3, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // fd
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A1, REG_SP, 0); // *buffer
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A2, REG_SP, 0); // size
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_WRITE);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);*/
+}
+void implement_print_name_syscall(uint64_t *context)
+{
+  uint64_t *name;
+  name = *(get_regs(context) + REG_A0);
+  print_name(name);
+}
+
+// NUEVO EJERCICIO DE FORK
+void emit_getppid()
+{
+  // registrar simbolo global: getppid() -> retorna uint64_t, 0 args
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("getppid"), 0, PROCEDURE, UINT64_T, 0, code_size);
+
+  // no hay argumentos entonces no cargamos A0,A2 desde el stack
+  emit_addi(REG_A7, REG_ZR, SYSCALL_GETPPID); // cargar numero de syscall en A7
+  emit_ecall();                               // llamar a la syscall
+  emit_jalr(REG_ZR, REG_RA, 0);               // volver a la instruccion siguiente a la llamada
+}
+
+void implement_getppid(uint64_t *context)
+{
+  uint64_t ppid;
+  /*
+  Obtener el ppid
+  dependemos de selfie como guarda la info de los procesos y muchas veces hay un campo en el PCB (process control block)
+  accecible via context
+  */
+  ppid = 0;
+  // escribirlo en el registro A0
+  *(get_regs(context) + REG_A0) = ppid;
+
+  // avanzar PC
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
 uint64_t is_boot_level_zero()
 {
   // C99 malloc(0) returns either a null pointer or a unique pointer,
@@ -8783,7 +8822,6 @@ uint64_t is_boot_level_zero()
   // selfie's malloc, cannot be boot level 0!
   return 0;
 }
-
 
 // -----------------------------------------------------------------
 // ------------------------ HYPSTER SYSCALL ------------------------
@@ -10940,12 +10978,9 @@ void record_ecall()
 
 void do_ecall()
 {
-  uint64_t a7;
   read_register(REG_A7);
 
   ic_ecall = ic_ecall + 1;
-
-  a7 = *(registers + REG_A7);
 
   if (redo)
   {
@@ -10979,24 +11014,33 @@ void do_ecall()
   else
   {
     read_register(REG_A0);
-    if (a7 != SYSCALL_EXIT)
+    // aqui comieza el listado de las nuevas syscall
+    if (*(registers + REG_A7) == SYSCALL_DUMMY_SYSCALL)
+      write_register(REG_A0);
+    else
     {
-      if (a7 != SYSCALL_COUNT_SYSCALLS){
-        if (a7 != SYSCALL_DUMMY){
-          if (a7 != SYSCALL_BRK){
-
+      if (*(registers + REG_A7) == SYSCALL_PRINT_NAME_SYSCALL)
+        write_register(REG_A0);
+      else
+      {
+        if (*(registers + REG_A7) != SYSCALL_EXIT)
+        {
+          if (*(registers + REG_A7) != SYSCALL_BRK)
+          {
             read_register(REG_A1);
             read_register(REG_A2);
 
-            if (a7 == SYSCALL_OPENAT)
+            if (*(registers + REG_A7) == SYSCALL_OPENAT)
               read_register(REG_A3);
           }
+
+          write_register(REG_A0);
         }
       }
-      write_register(REG_A0);
     }
+
     // all system calls other than switch are handled by exception
-    throw_exception(EXCEPTION_SYSCALL, a7);
+    throw_exception(EXCEPTION_SYSCALL, *(registers + REG_A7));
   }
 }
 
@@ -12763,7 +12807,6 @@ uint64_t handle_system_call(uint64_t *context)
   set_ec_syscall(context, get_ec_syscall(context) + 1);
 
   a7 = *(get_regs(context) + REG_A7);
-  //printf("Handling syscall with id: %lu\n",a7);
 
   if (a7 == SYSCALL_BRK)
   {
@@ -12778,17 +12821,23 @@ uint64_t handle_system_call(uint64_t *context)
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
-  else if (a7 == SYSCALL_DUMMY)  // dummy_syscall
+  else if (a7 == SYSCALL_DUMMY_SYSCALL)
     implement_dummy_syscall(context);
-  else if (a7 == SYSCALL_COUNT_SYSCALLS) // count_syscall
-    implement_count_syscalls(context);
+  else if (a7 == SYSCALL_PRINT_NAME_SYSCALL)
+    implement_print_name_syscall(context);
+  else if (a7 == SYSCALL_GETPPID)
+  {
+    implement_getppid(context);
+    return EXITCODE_NOERROR;
+  }
   else if (a7 == SYSCALL_EXIT)
   {
     implement_exit(context);
 
     // TODO: exit only if all contexts have exited
     return EXIT;
-  } else
+  }
+  else
   {
     printf("%s: unknown system call %lu\n", selfie_name, a7);
 
@@ -13524,9 +13573,9 @@ int main(int argc, char **argv)
   uint64_t exit_code;
 
   init_selfie((uint64_t)argc, (uint64_t *)argv);
-
   init_library();
   init_system();
+  printf("%s: This is Ronaldo Flores's Selfie!\n", selfie_name);
   init_target();
   init_kernel();
 
