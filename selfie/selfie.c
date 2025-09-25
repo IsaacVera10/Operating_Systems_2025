@@ -1567,6 +1567,7 @@ uint64_t NUMBEROFLEAFPTES = 512; // number of leaf page table entries == PAGESIZ
 
 void init_memory(uint64_t megabytes)
 {
+  // printf("%ld MB physical memory\n", megabytes);
   if (megabytes < 1)
     megabytes = 1;
   else if (megabytes > 4096)
@@ -2464,6 +2465,8 @@ void boot_loader(uint64_t *context);
 
 uint64_t selfie_run(uint64_t machine);
 
+uint64_t selfie_run_mipsterOS(uint64_t machine); // process_lab
+
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
 uint64_t *MY_CONTEXT = (uint64_t *)0;
@@ -2584,6 +2587,9 @@ void init_selfie(uint64_t argc, uint64_t *argv)
 {
   selfie_argc = argc;
   selfie_argv = argv;
+
+  // for(uint64_t i=0;i<argc;i++)
+  //   printf("argv[%lu] = %s\n", i, (char*)*(argv+i));
 
   selfie_name = get_argument();
 
@@ -12927,10 +12933,24 @@ uint64_t hypster(uint64_t *to_context)
     from_context = hypster_switch(to_context, TIMESLICE);
 
     if (handle_exception(from_context) == EXIT)
-      return get_exit_code(from_context);
+    {
+      // Si un contexto sale, lo eliminamos de la lista
+      used_contexts = delete_context(from_context, used_contexts);
+      
+      // Si ya no hay más contextos, terminamos
+      if (used_contexts == (uint64_t *)0)
+        return get_exit_code(from_context);
+      
+      // Continuar con el siguiente contexto
+      to_context = used_contexts;
+    }
     else
-      // TODO: scheduler should go here
-      to_context = from_context;
+    {
+      // Round-robin scheduling: pasar al siguiente contexto
+      to_context = get_next_context(from_context);
+      if (to_context == (uint64_t *)0)
+        to_context = used_contexts;
+    }
   }
 }
 
@@ -13320,6 +13340,139 @@ uint64_t selfie_run(uint64_t machine)
   return exit_code;
 }
 
+
+uint64_t selfie_run_mipsterOS(uint64_t machine){ // process_lab
+  uint64_t exit_code;
+
+  uint64_t num_contexts; //process_lab
+  uint64_t memory_per_context = 8;
+
+  if (code_size == 0)
+  {
+    printf("%s: nothing to run, debug, or host\n", selfie_name);
+
+    return EXITCODE_BADARGUMENTS;
+  }
+  else if (machine == HYPSTER)
+  {
+    if (OS != SELFIE)
+    {
+      printf("%s: hypster only runs on mipster\n", selfie_name);
+
+      return EXITCODE_BADARGUMENTS;
+    }
+  }
+  else if (machine == DIPSTER)
+  {
+    debug = 1;
+    debug_syscalls = 1;
+
+    machine = MIPSTER;
+  }
+  else if (machine == RIPSTER)
+  {
+    init_replay_engine();
+
+    debug = 1;
+    record = 1;
+
+    machine = MIPSTER;
+  }
+  else if (machine == CAPSTER)
+  {
+    init_all_caches();
+
+    L1_CACHE_ENABLED = 1;
+
+    machine = MIPSTER;
+  }
+
+  reset_interpreter();
+  reset_profiler();
+  reset_microkernel();
+
+  num_contexts = atoi(peek_argument(0)); //process_lab
+
+  init_memory(num_contexts * memory_per_context + 4);
+
+  while(num_contexts>0){ //process_lab
+    current_context = create_context(MY_CONTEXT, 0);
+
+    // assert: number_of_remaining_arguments() > 0
+
+    boot_loader(current_context);
+
+    // current_context is ready to run
+    num_contexts = num_contexts - 1;
+  }
+  current_context = used_contexts;
+  run = 1;
+
+  printf("%s: %lu-bit %s executing %lu-bit RISC-U binary %s with %luMB physical memory", selfie_name,
+         SIZEOFUINT64INBITS,
+         (char *)*(MACHINES + machine),
+         WORDSIZEINBITS,
+         binary_name,
+         PHYSICALMEMORYSIZE / MEGABYTE);
+
+  if (GC_ON)
+  {
+    gc_init(current_context);
+
+    printf(", gcing every %lu mallocs, ", GC_PERIOD);
+    if (GC_REUSE)
+      printf("reusing memory");
+    else
+      printf("not reusing memory");
+  }
+
+  if (debug)
+  {
+    if (record)
+      printf(", and replay");
+    else
+      printf(", and debugger");
+  }
+
+  printf("\n%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n", selfie_name);
+
+  if (machine == MIPSTER)
+    exit_code = mipster(current_context);
+  else if (machine == HYPSTER)
+    exit_code = hypster(current_context);
+  else if (machine == MINSTER)
+    exit_code = minster(current_context);
+  else if (machine == MOBSTER)
+    exit_code = mobster(current_context);
+  else if (machine == MIXTER)
+    // change 0 to anywhere between 0% to 100% mipster over hypster
+    exit_code = mixter(current_context, 0);
+  else
+    exit_code = 0;
+
+  printf("\n%s: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n", selfie_name);
+
+  printf("%s: %lu-bit %s terminating %lu-bit RISC-U binary %s with exit code %ld\n", selfie_name,
+         SIZEOFUINT64INBITS,
+         (char *)*(MACHINES + machine),
+         WORDSIZEINBITS,
+         binary_name,
+         sign_extend(exit_code, SYSCALL_BITWIDTH));
+
+  print_profile();
+
+  run = 0;
+
+  record = 0;
+
+  debug_syscalls = 0;
+  debug = 0;
+
+  printf("%s: ################################################################################\n", selfie_name);
+
+  return exit_code;
+}
+
 // -----------------------------------------------------------------
 // ------------------- CONSOLE ARGUMENT SCANNER --------------------
 // -----------------------------------------------------------------
@@ -13410,8 +13563,9 @@ uint64_t selfie(uint64_t extras)
 
       experimental_features();
 
-      if (string_compare(argument, "-c"))
+      if (string_compare(argument, "-c")){
         selfie_compile();
+      }
       else if (number_of_remaining_arguments() == 0)
         // remaining options have at least one argument
         return EXITCODE_BADARGUMENTS;
@@ -13439,6 +13593,10 @@ uint64_t selfie(uint64_t extras)
           return selfie_run(MOBSTER);
         else if (string_compare(argument, "-L1"))
           return selfie_run(CAPSTER);
+        else if (string_compare(argument, "-x")) // process_lab 
+          return selfie_run_mipsterOS(MIPSTER);
+        else if (string_compare(argument, "-z"))
+          return selfie_run_mipsterOS(HYPSTER);
         else
           return EXITCODE_BADARGUMENTS;
       }
@@ -13532,5 +13690,5 @@ int main(int argc, char **argv)
 
   exit_code = selfie(0);
 
-  return exit_selfie(exit_code, " [ ( -m | -d | -r | -y ) 0-4096 ... ]");
+  return exit_selfie(exit_code, " [ ( -m | -d | -r | -y | -x <number> | -z <number> ) 0-4096 ... ]");
 }
