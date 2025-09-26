@@ -259,6 +259,20 @@ def check_processes() -> List[Check]:
         check_interleaved_output('./selfie -c selfie.c -m 128 -c <assignment>hello-world.c -z 10', 'Hello World!    ', 10,
                                  '10 Hypster processes are running concurrently')
 
+def check_fork() -> List[Check]:
+    return  check_execution('./selfie -c <assignment>test0.c -m 128',
+                           'fork creates a child process',
+                           success_criteria=lambda code, out: is_expected_output(out, "01")) + \
+        check_execution('./selfie -c <assignment>double-fork.c -m 128',
+                            'two-level fork',
+                            success_criteria=lambda code, out: is_expected_output(out, "0023")) + \
+        check_execution('./selfie -c <assignment>print.c -m 128',
+                           'three-level fork',
+                           success_criteria=lambda code, out: is_interleaved_output(out, 'Hello World!    ', 8)) + \
+        check_mipster_execution('parallel-print.c',
+                                lambda code, out: is_permutation_of(
+                                    out, [0, 1, 2, 3, 4, 5, 6, 7]),
+                                'fork creates a child process')
 
 def check_fork_and_wait() -> List[Check]:
     return check_compilable('parallel-print.c', 'fork and wait compiled') + \
@@ -391,6 +405,9 @@ assignment_self_assemblation = Assignment('self-assembler', 'Systems', 'assemble
 assignment_processes = Assignment('processes', 'Systems', 'processes',
            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-processes',
            check_processes)
+assignment_fork = Assignment('fork', 'Systems', 'fork',
+           REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-fork',
+           check_fork)
 assignment_fork_and_wait = Assignment('fork-wait', 'Systems', 'system-calls',
            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-fork-wait',
            check_fork_and_wait, parent = assignment_processes)
@@ -439,7 +456,8 @@ assignments: List[Assignment] = [
     assignment_threadsafe_malloc,
     assignment_treiber_stack,
     assignment_scheduler,
-    assignment_count_syscalls
+    assignment_count_syscalls,
+    assignment_fork
 ]
 
 

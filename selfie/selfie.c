@@ -507,8 +507,9 @@ uint64_t symbol; // most recently recognized symbol
 char *source_name = (char *)0; // name of source file
 uint64_t source_fd = 0;        // file descriptor of open source file
 
-// ------------------------- INITIALIZATION ------------------------
+uint64_t next_pid = 0;         // fork
 
+// ------------------------- INITIALIZATION ------------------------
 void init_scanner()
 {
   SYMBOLS = smalloc((SYM_CONST + 1) * sizeof(uint64_t *));
@@ -1299,6 +1300,9 @@ void implement_dummy_syscall(uint64_t *context); // dummy_syscall
 void emit_count_syscalls(); // count_syscall
 void implement_count_syscalls(uint64_t *context); // count_syscall
 
+void emit_fork(); // fork
+void implement_fork(uint64_t *context); // fork
+
 void emit_open();
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s);
 void implement_openat(uint64_t *context);
@@ -1324,6 +1328,7 @@ uint64_t SYSCALL_OPENAT = 56;
 uint64_t SYSCALL_BRK = 214;
 uint64_t SYSCALL_DUMMY = 1;           // dummy_syscall
 uint64_t SYSCALL_COUNT_SYSCALLS = 2; // count_syscall
+uint64_t SYSCALL_FORK = 3;            // fork
 
 /* DIRFD_AT_FDCWD corresponds to AT_FDCWD in fcntl.h and
    is passed as first argument of the openat system call
@@ -2257,7 +2262,7 @@ uint64_t *delete_context(uint64_t *context, uint64_t *from);
 // number of entries of a machine context:
 // 14 uint64_t + 6 uint64_t* + 1 char* + 7 uint64_t + 2 uint64_t* + 2 uint64_t entries
 // extended in the symbolic execution engine and the Boehm garbage collector
-uint64_t CONTEXTENTRIES = 32;
+uint64_t CONTEXTENTRIES = 33;
 
 uint64_t *allocate_context(); // declaration avoids warning in the Boehm garbage collector
 
@@ -2302,6 +2307,8 @@ uint64_t free_list_head(uint64_t *context) { return (uint64_t)(context + 29); }
 uint64_t gcs_in_period(uint64_t *context) { return (uint64_t)(context + 30); }
 uint64_t use_gc_kernel(uint64_t *context) { return (uint64_t)(context + 31); }
 
+uint64_t id(uint64_t* context) { return (uint64_t)(context + 32); } // fork
+
 uint64_t *get_next_context(uint64_t *context) { return (uint64_t *)*context; }
 uint64_t *get_prev_context(uint64_t *context) { return (uint64_t *)*(context + 1); }
 uint64_t get_pc(uint64_t *context) { return *(context + 2); }
@@ -2336,6 +2343,7 @@ uint64_t *get_used_list_head(uint64_t *context) { return (uint64_t *)*(context +
 uint64_t *get_free_list_head(uint64_t *context) { return (uint64_t *)*(context + 29); }
 uint64_t get_gcs_in_period(uint64_t *context) { return *(context + 30); }
 uint64_t get_use_gc_kernel(uint64_t *context) { return *(context + 31); }
+uint64_t get_process_id(uint64_t *context) { return *(context + 32); } // fork
 
 void set_next_context(uint64_t *context, uint64_t *next) { *context = (uint64_t)next; }
 void set_prev_context(uint64_t *context, uint64_t *prev) { *(context + 1) = (uint64_t)prev; }
@@ -2371,6 +2379,8 @@ void set_used_list_head(uint64_t *context, uint64_t *used_list_head) { *(context
 void set_free_list_head(uint64_t *context, uint64_t *free_list_head) { *(context + 29) = (uint64_t)free_list_head; }
 void set_gcs_in_period(uint64_t *context, uint64_t gcs) { *(context + 30) = gcs; }
 void set_use_gc_kernel(uint64_t *context, uint64_t use) { *(context + 31) = use; }
+
+void set_process_id(uint64_t *context, uint64_t pid) { *(context + 32) = pid; }
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -6863,6 +6873,7 @@ void selfie_compile()
   emit_open();
   emit_dummy_syscall(); // dummy_syscall
   emit_count_syscalls(); // count_syscall
+  emit_fork(); // fork
 
   emit_malloc();
 
@@ -8507,7 +8518,6 @@ void emit_dummy_syscall(){ // dummy_syscall
   emit_ecall();
   emit_jalr(REG_ZR, REG_RA, 0);
 }
-
 void implement_dummy_syscall(uint64_t *context){ // dummy_syscall
   // parameter
   uint64_t fd;
@@ -8563,6 +8573,122 @@ void implement_count_syscalls(uint64_t *context){ // count_syscall
   }
 }
 
+void emit_fork(){
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("fork"),
+                            0, PROCEDURE, UINT64_T, 0, code_size);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_FORK);
+  emit_ecall();
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_fork(uint64_t *context){
+  // variables locales
+  uint64_t vaddr;
+  uint64_t end;
+  uint64_t iReg;
+  uint64_t *new_child_context;
+
+  if (debug_syscalls) {
+    printf("(fork): |- process %lu forking\n", get_process_id(context));
+  }
+
+  // Crear nuevo contexto hijo
+  new_child_context = create_context(MY_CONTEXT, (uint64_t *)0);
+  
+  if (new_child_context != (uint64_t *)0) {
+    // Asignar PID único al proceso hijo
+
+    // Copiar atributos del PCB del padre al hijo
+    set_pc(new_child_context, get_pc(context));
+    set_lowest_lo_page(new_child_context, get_lowest_lo_page(context));
+    set_highest_lo_page(new_child_context, get_highest_lo_page(context));
+    set_lowest_hi_page(new_child_context, get_lowest_hi_page(context));
+    set_highest_hi_page(new_child_context, get_highest_hi_page(context));
+    set_code_seg_start(new_child_context, get_code_seg_start(context));
+    set_code_seg_size(new_child_context, get_code_seg_size(context));
+    set_data_seg_start(new_child_context, get_data_seg_start(context));
+    set_data_seg_size(new_child_context, get_data_seg_size(context));
+    set_heap_seg_start(new_child_context, get_heap_seg_start(context));
+    set_program_break(new_child_context, get_program_break(context));
+    set_exception(new_child_context, EXCEPTION_NOEXCEPTION);
+    set_fault(new_child_context, 0);
+    set_exit_code(new_child_context, EXITCODE_NOERROR);
+    set_name(new_child_context, get_name(context));
+
+    // Copiar segmento de CÓDIGO
+    vaddr = get_code_seg_start(context);
+    end = get_code_seg_start(context) + get_code_seg_size(context);
+    while (vaddr < end){
+      if (is_virtual_address_mapped(get_pt(context), vaddr))
+        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
+      vaddr = vaddr + WORDSIZE;
+    }
+    
+    // Copiar segmento de DATOS
+    vaddr = get_data_seg_start(context);
+    end = get_data_seg_start(context) + get_data_seg_size(context);
+    while (vaddr < end){
+      if (is_virtual_address_mapped(get_pt(context), vaddr))
+        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
+      vaddr = vaddr + WORDSIZE;
+    }
+
+    // Copiar segmento de HEAP
+    if (get_program_break(context) > get_heap_seg_start(context)) {
+      vaddr = get_heap_seg_start(context);
+      end = get_program_break(context);
+      while (vaddr < end){
+        if (is_virtual_address_mapped(get_pt(context), vaddr))
+          map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
+        vaddr = vaddr + WORDSIZE;
+      }
+    }
+
+    // Copiar segmento de STACK
+    vaddr = *(get_regs(context) + REG_SP);
+    end = HIGHESTVIRTUALADDRESS;
+    while (vaddr <= end){
+      if (is_virtual_address_mapped(get_pt(context), vaddr))
+        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
+      vaddr = vaddr + WORDSIZE; // Cambio: usar WORDSIZE en lugar de 1
+    }
+
+    // Copiar TODOS los registros del padre al hijo
+    iReg = 0;
+    while (iReg < NUMBEROFREGISTERS){
+      *(get_regs(new_child_context) + iReg) = *(get_regs(context) + iReg);
+      iReg = iReg + 1;
+    }
+
+    // Configurar valores de retorno según semántica de fork()
+    // Proceso padre: retornar PID del hijo
+    *(get_regs(context) + REG_A0) = get_process_id(new_child_context);
+    // Proceso hijo: retornar 0
+    *(get_regs(new_child_context) + REG_A0) = 0;
+
+    // Avanzar PC en ambos contextos
+    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+    set_pc(new_child_context, get_pc(new_child_context) + INSTRUCTIONSIZE);
+
+    if (debug_syscalls) {
+      printf("(fork): parent %lu created child %lu\n", 
+             get_process_id(context), get_process_id(new_child_context));
+    }
+  } else {
+    // Fork falló
+    *(get_regs(context) + REG_A0) = -1;
+    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+    
+    if (debug_syscalls) {
+      printf("(fork): failed - could not create context\n");
+    }
+  }
+
+  if (debug_syscalls) {
+    printf("(fork): -> %lu\n", *(get_regs(context) + REG_A0));
+  }
+}
 
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s)
 {
@@ -10987,15 +11113,17 @@ void do_ecall()
     read_register(REG_A0);
     if (a7 != SYSCALL_EXIT)
     {
-      if (a7 != SYSCALL_COUNT_SYSCALLS){
-        if (a7 != SYSCALL_DUMMY){
-          if (a7 != SYSCALL_BRK){
+      if (a7 != SYSCALL_FORK){
+        if (a7 != SYSCALL_COUNT_SYSCALLS){
+          if (a7 != SYSCALL_DUMMY){
+            if (a7 != SYSCALL_BRK){
 
-            read_register(REG_A1);
-            read_register(REG_A2);
+              read_register(REG_A1);
+              read_register(REG_A2);
 
-            if (a7 == SYSCALL_OPENAT)
-              read_register(REG_A3);
+              if (a7 == SYSCALL_OPENAT)
+                read_register(REG_A3);
+            }
           }
         }
       }
@@ -12122,7 +12250,7 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
   set_highest_hi_page(context, get_lowest_hi_page(context));
 
   if (parent != MY_CONTEXT)
-  {
+  { // proceso hijo
     set_code_seg_start(context, load_virtual_memory(get_pt(parent), code_seg_start(vctxt)));
     set_code_seg_size(context, load_virtual_memory(get_pt(parent), code_seg_size(vctxt)));
     set_data_seg_start(context, load_virtual_memory(get_pt(parent), data_seg_start(vctxt)));
@@ -12134,13 +12262,17 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
     down_load_string(parent, load_virtual_memory(get_pt(parent), name(vctxt)), context_name);
 
     set_name(context, context_name);
+    set_process_id(context, 0); // fork: temporalmente 0, luego se asigna en el implement_fork()
   }
   else
-  {
+  { // proceso padre
     set_exception(context, EXCEPTION_NOEXCEPTION);
     set_fault(context, 0);
 
     set_exit_code(context, EXITCODE_NOERROR);
+
+    set_process_id(context, next_pid);
+    next_pid = next_pid + 1;
   }
 
   set_parent(context, parent);
@@ -12788,6 +12920,8 @@ uint64_t handle_system_call(uint64_t *context)
     implement_dummy_syscall(context);
   else if (a7 == SYSCALL_COUNT_SYSCALLS) // count_syscall
     implement_count_syscalls(context);
+  else if (a7 == SYSCALL_FORK)
+    implement_fork(context); // fork
   else if (a7 == SYSCALL_EXIT)
   {
     implement_exit(context);
@@ -13345,7 +13479,9 @@ uint64_t selfie_run_mipsterOS(uint64_t machine){ // process_lab
   uint64_t exit_code;
 
   uint64_t num_contexts; //process_lab
-  uint64_t memory_per_context = 8;
+  uint64_t memory_per_context;
+
+  memory_per_context = 8;
 
   if (code_size == 0)
   {
