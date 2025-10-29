@@ -2598,8 +2598,9 @@ void init_selfie(uint64_t argc, uint64_t *argv)
   selfie_argc = argc;
   selfie_argv = argv;
 
-  // for(uint64_t i=0;i<argc;i++)
+  // for(uint64_t i=0;i<argc;i++){
   //   printf("argv[%lu] = %s\n", i, (char*)*(argv+i));
+  // }
 
   selfie_name = get_argument();
 
@@ -8588,10 +8589,6 @@ void implement_fork(uint64_t *context){
   uint64_t end;
   uint64_t iReg;
   uint64_t *new_child_context;
-
-  if (debug_syscalls) {
-    printf("(fork): |- process %lu forking\n", get_process_id(context));
-  }
 
   // Crear nuevo contexto hijo
   new_child_context = create_context(MY_CONTEXT, (uint64_t *)0);

@@ -12,6 +12,7 @@ int main() {
   pid = fork();
   if (pid == 0) {
     lock();
+
     write(1, foo_child, 16);
     // The lock will not be released intentionally before the child process terminates
     exit(0);
