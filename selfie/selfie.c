@@ -507,8 +507,6 @@ uint64_t symbol; // most recently recognized symbol
 char *source_name = (char *)0; // name of source file
 uint64_t source_fd = 0;        // file descriptor of open source file
 
-uint64_t next_pid = 0;         // fork
-
 // ------------------------- INITIALIZATION ------------------------
 void init_scanner()
 {
@@ -2258,11 +2256,14 @@ uint64_t *delete_context(uint64_t *context, uint64_t *from);
 // | 30 | gcs counter     | number of gc runs in gc period
 // | 31 | gc enabled      | flag indicating whether to use gc or not
 // +----+-----------------+
+// | 32 | id_context      | context id for fork
+// | 33 | ptr_parent_ctx | pointer to parent context for fork
+// +----+-----------------+
 
 // number of entries of a machine context:
 // 14 uint64_t + 6 uint64_t* + 1 char* + 7 uint64_t + 2 uint64_t* + 2 uint64_t entries
 // extended in the symbolic execution engine and the Boehm garbage collector
-uint64_t CONTEXTENTRIES = 33;
+uint64_t CONTEXTENTRIES = 34;
 
 uint64_t *allocate_context(); // declaration avoids warning in the Boehm garbage collector
 
@@ -2306,8 +2307,8 @@ uint64_t used_list_head(uint64_t *context) { return (uint64_t)(context + 28); }
 uint64_t free_list_head(uint64_t *context) { return (uint64_t)(context + 29); }
 uint64_t gcs_in_period(uint64_t *context) { return (uint64_t)(context + 30); }
 uint64_t use_gc_kernel(uint64_t *context) { return (uint64_t)(context + 31); }
-
-uint64_t id(uint64_t* context) { return (uint64_t)(context + 32); } // fork
+uint64_t id_context(uint64_t* context) { return (uint64_t)(context + 32); } // fork
+uint64_t ptr_parent_ctx(uint64_t* context) { return (uint64_t)(context + 33); } // fork
 
 uint64_t *get_next_context(uint64_t *context) { return (uint64_t *)*context; }
 uint64_t *get_prev_context(uint64_t *context) { return (uint64_t *)*(context + 1); }
@@ -2343,7 +2344,8 @@ uint64_t *get_used_list_head(uint64_t *context) { return (uint64_t *)*(context +
 uint64_t *get_free_list_head(uint64_t *context) { return (uint64_t *)*(context + 29); }
 uint64_t get_gcs_in_period(uint64_t *context) { return *(context + 30); }
 uint64_t get_use_gc_kernel(uint64_t *context) { return *(context + 31); }
-uint64_t get_process_id(uint64_t *context) { return *(context + 32); } // fork
+uint64_t get_id_context(uint64_t *context) { return *(context + 32); } // fork
+uint64_t* get_ptr_parent_ctx(uint64_t *context) { return (uint64_t*)*(context + 33); } // fork
 
 void set_next_context(uint64_t *context, uint64_t *next) { *context = (uint64_t)next; }
 void set_prev_context(uint64_t *context, uint64_t *prev) { *(context + 1) = (uint64_t)prev; }
@@ -2379,8 +2381,8 @@ void set_used_list_head(uint64_t *context, uint64_t *used_list_head) { *(context
 void set_free_list_head(uint64_t *context, uint64_t *free_list_head) { *(context + 29) = (uint64_t)free_list_head; }
 void set_gcs_in_period(uint64_t *context, uint64_t gcs) { *(context + 30) = gcs; }
 void set_use_gc_kernel(uint64_t *context, uint64_t use) { *(context + 31) = use; }
-
-void set_process_id(uint64_t *context, uint64_t pid) { *(context + 32) = pid; }
+void set_id_context(uint64_t *context, uint64_t pid) { *(context + 32) = pid; } // fork
+void set_ptr_parent_ctx(uint64_t *context, uint64_t* pctx) { *(context + 33) = (uint64_t)pctx; } // fork
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -2422,6 +2424,8 @@ uint64_t *current_context = (uint64_t *)0; // context currently running
 
 uint64_t *used_contexts = (uint64_t *)0; // doubly-linked list of used contexts
 uint64_t *free_contexts = (uint64_t *)0; // singly-linked list of free contexts
+
+uint64_t id_ctxt_counter = 0; // fork
 
 // ------------------------- INITIALIZATION ------------------------
 
@@ -2605,6 +2609,7 @@ void init_selfie(uint64_t argc, uint64_t *argv)
   selfie_name = get_argument();
 
   printf("%s: This is Isaac Vera's Selfie!\n", selfie_name); //LAB_0
+
 }
 
 void init_system()
@@ -8583,108 +8588,90 @@ void emit_fork(){
   emit_jalr(REG_ZR, REG_RA, 0);
 }
 
-void implement_fork(uint64_t *context){
+void implement_fork(uint64_t *context){ // fork
   // variables locales
-  uint64_t vaddr;
+  uint64_t bgn;
   uint64_t end;
-  uint64_t iReg;
-  uint64_t *new_child_context;
+  uint64_t it;
+  uint64_t* child_context;
+  uint64_t* parent_regs;
+  uint64_t* child_regs;
 
-  // Crear nuevo contexto hijo
-  new_child_context = create_context(MY_CONTEXT, (uint64_t *)0);
+  child_context = create_context(MY_CONTEXT, 0);
+
+  // 1. Copiar atributos del PCB del padre al PCB vacío del hijo
+  set_pc(child_context, get_pc(context)); // [2]
+
+  set_lowest_lo_page(child_context, get_lowest_lo_page(context));   // [5]
+  set_highest_lo_page(child_context, get_highest_lo_page(context)); // [6]
+  set_lowest_hi_page(child_context, get_lowest_hi_page(context));   // [7]
+  set_highest_hi_page(child_context, get_highest_hi_page(context)); // [8]
+
+  set_code_seg_start(child_context, get_code_seg_start(context));   // [9]
+  set_code_seg_size(child_context, get_code_seg_size(context));     // [10]
+
+  set_data_seg_start(child_context, get_data_seg_start(context));   // [11]
+  set_data_seg_size(child_context, get_data_seg_size(context));     // [12]
+
+  set_heap_seg_start(child_context, get_heap_seg_start(context));   // [13]
+  set_program_break(child_context, get_program_break(context));     // [14]
+
+  // 2. Copiar segmento de CÓDIGO
+  bgn = get_code_seg_start(context);
+  end = get_code_seg_start(context) + get_code_seg_size(context);
+  while (bgn < end){
+    if (is_virtual_address_mapped(get_pt(context), bgn))
+      map_and_store(child_context, bgn, load_virtual_memory(get_pt(context), bgn));
+    bgn = bgn + WORDSIZE;
+  }
   
-  if (new_child_context != (uint64_t *)0) {
-    // Asignar PID único al proceso hijo
-
-    // Copiar atributos del PCB del padre al hijo
-    set_pc(new_child_context, get_pc(context));
-    set_lowest_lo_page(new_child_context, get_lowest_lo_page(context));
-    set_highest_lo_page(new_child_context, get_highest_lo_page(context));
-    set_lowest_hi_page(new_child_context, get_lowest_hi_page(context));
-    set_highest_hi_page(new_child_context, get_highest_hi_page(context));
-    set_code_seg_start(new_child_context, get_code_seg_start(context));
-    set_code_seg_size(new_child_context, get_code_seg_size(context));
-    set_data_seg_start(new_child_context, get_data_seg_start(context));
-    set_data_seg_size(new_child_context, get_data_seg_size(context));
-    set_heap_seg_start(new_child_context, get_heap_seg_start(context));
-    set_program_break(new_child_context, get_program_break(context));
-    set_exception(new_child_context, EXCEPTION_NOEXCEPTION);
-    set_fault(new_child_context, 0);
-    set_exit_code(new_child_context, EXITCODE_NOERROR);
-    set_name(new_child_context, get_name(context));
-
-    // Copiar segmento de CÓDIGO
-    vaddr = get_code_seg_start(context);
-    end = get_code_seg_start(context) + get_code_seg_size(context);
-    while (vaddr < end){
-      if (is_virtual_address_mapped(get_pt(context), vaddr))
-        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
-      vaddr = vaddr + WORDSIZE;
-    }
-    
-    // Copiar segmento de DATOS
-    vaddr = get_data_seg_start(context);
-    end = get_data_seg_start(context) + get_data_seg_size(context);
-    while (vaddr < end){
-      if (is_virtual_address_mapped(get_pt(context), vaddr))
-        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
-      vaddr = vaddr + WORDSIZE;
-    }
-
-    // Copiar segmento de HEAP
-    if (get_program_break(context) > get_heap_seg_start(context)) {
-      vaddr = get_heap_seg_start(context);
-      end = get_program_break(context);
-      while (vaddr < end){
-        if (is_virtual_address_mapped(get_pt(context), vaddr))
-          map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
-        vaddr = vaddr + WORDSIZE;
-      }
-    }
-
-    // Copiar segmento de STACK
-    vaddr = *(get_regs(context) + REG_SP);
-    end = HIGHESTVIRTUALADDRESS;
-    while (vaddr <= end){
-      if (is_virtual_address_mapped(get_pt(context), vaddr))
-        map_and_store(new_child_context, vaddr, load_virtual_memory(get_pt(context), vaddr));
-      vaddr = vaddr + WORDSIZE; // Cambio: usar WORDSIZE en lugar de 1
-    }
-
-    // Copiar TODOS los registros del padre al hijo
-    iReg = 0;
-    while (iReg < NUMBEROFREGISTERS){
-      *(get_regs(new_child_context) + iReg) = *(get_regs(context) + iReg);
-      iReg = iReg + 1;
-    }
-
-    // Configurar valores de retorno según semántica de fork()
-    // Proceso padre: retornar PID del hijo
-    *(get_regs(context) + REG_A0) = get_process_id(new_child_context);
-    // Proceso hijo: retornar 0
-    *(get_regs(new_child_context) + REG_A0) = 0;
-
-    // Avanzar PC en ambos contextos
-    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-    set_pc(new_child_context, get_pc(new_child_context) + INSTRUCTIONSIZE);
-
-    if (debug_syscalls) {
-      printf("(fork): parent %lu created child %lu\n", 
-             get_process_id(context), get_process_id(new_child_context));
-    }
-  } else {
-    // Fork falló
-    *(get_regs(context) + REG_A0) = -1;
-    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-    
-    if (debug_syscalls) {
-      printf("(fork): failed - could not create context\n");
-    }
+  // 3. Copiar segmento de DATOS
+  bgn = get_data_seg_start(context);
+  end = get_data_seg_start(context) + get_data_seg_size(context);
+  while (bgn < end){
+    if (is_virtual_address_mapped(get_pt(context), bgn))
+      map_and_store(child_context, bgn, load_virtual_memory(get_pt(context), bgn));
+    bgn = bgn + WORDSIZE;
   }
 
-  if (debug_syscalls) {
-    printf("(fork): -> %lu\n", *(get_regs(context) + REG_A0));
+  // 4. Copiar segmento de HEAP
+  bgn = get_heap_seg_start(context);
+  end = get_program_break(context);
+  while (bgn < end){
+    if (is_virtual_address_mapped(get_pt(context), bgn))
+      map_and_store(child_context, bgn, load_virtual_memory(get_pt(context), bgn));
+    bgn = bgn + WORDSIZE;
   }
+
+  // 5. Copiar segmento de STACK
+  bgn = *(get_regs(context) + REG_SP);
+  end = HIGHESTVIRTUALADDRESS;
+  while (bgn <= end){
+    if (is_virtual_address_mapped(get_pt(context), bgn))
+      map_and_store(child_context, bgn, load_virtual_memory(get_pt(context), bgn));
+    bgn = bgn + WORDSIZE; // Cambio: usar WORDSIZE en lugar de 1
+  }
+
+  // 6. Copiar registros y PC
+  parent_regs = get_regs(context);
+  child_regs = get_regs(child_context);
+  it = 0;
+  while (it < NUMBEROFREGISTERS){
+    *(child_regs + it) = *(parent_regs + it);
+    it = it + 1;
+  }
+
+  // 7. Ajustar valores de retorno en padre e hijo
+  *(parent_regs + REG_A0) = get_id_context(child_context); // Padre retorna su PID
+  *(child_regs + REG_A0) = 0; // Hijo retorna 0
+
+  // 8. Avanzar PC en ambos contextos
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+  set_pc(child_context, get_pc(child_context) + INSTRUCTIONSIZE);
+
+  // 9. seteo parent_context e hijo a listo para correr
+  set_ptr_parent_ctx(child_context, context);
+
 }
 
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s)
@@ -12247,7 +12234,7 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
   set_highest_hi_page(context, get_lowest_hi_page(context));
 
   if (parent != MY_CONTEXT)
-  { // proceso hijo
+  {// Si parent no es el kernel
     set_code_seg_start(context, load_virtual_memory(get_pt(parent), code_seg_start(vctxt)));
     set_code_seg_size(context, load_virtual_memory(get_pt(parent), code_seg_size(vctxt)));
     set_data_seg_start(context, load_virtual_memory(get_pt(parent), data_seg_start(vctxt)));
@@ -12259,17 +12246,13 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
     down_load_string(parent, load_virtual_memory(get_pt(parent), name(vctxt)), context_name);
 
     set_name(context, context_name);
-    set_process_id(context, 0); // fork: temporalmente 0, luego se asigna en el implement_fork()
   }
   else
-  { // proceso padre
+  { // Si parent es el kernel
     set_exception(context, EXCEPTION_NOEXCEPTION);
     set_fault(context, 0);
 
     set_exit_code(context, EXITCODE_NOERROR);
-
-    set_process_id(context, next_pid);
-    next_pid = next_pid + 1;
   }
 
   set_parent(context, parent);
@@ -12289,6 +12272,12 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
   set_free_list_head(context, (uint64_t *)0);
   set_gcs_in_period(context, 0);
   set_use_gc_kernel(context, GC_DISABLED);
+
+  //New Settings
+  set_id_context(context, id_ctxt_counter); // fork
+  id_ctxt_counter = id_ctxt_counter + 1;
+
+  set_ptr_parent_ctx(context, (uint64_t *)0); // fork: seteamos el parent_context a null
 }
 
 uint64_t *find_context(uint64_t *parent, uint64_t *vctxt)
@@ -12558,6 +12547,10 @@ void restore_context(uint64_t *context)
   flush_all_caches();
 
   set_ic_all(context, get_total_number_of_instructions() - get_ic_all(context));
+
+  // printf("DEBUG regs: gp=0x%lx sp=0x%lx ra=0x%lx pc=0x%lx\n",
+  //      *(registers+REG_GP), *(registers+REG_SP), *(registers+REG_RA), *(registers+REG_A6));
+
 }
 
 uint64_t is_code_address(uint64_t *context, uint64_t vaddr)
@@ -13344,6 +13337,11 @@ void boot_loader(uint64_t *context)
   set_argument(get_name(context));
 
   up_load_arguments(context, number_of_remaining_arguments(), remaining_arguments());
+
+  // printf("DEBUG boot: pc=0x%lx sp=0x%lx name=%s\n",
+  //      get_pc(context),
+  //      *(get_regs(context)+REG_SP),
+  //      get_name(context));
 }
 
 uint64_t selfie_run(uint64_t machine)
