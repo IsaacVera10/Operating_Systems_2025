@@ -350,6 +350,15 @@ def check_count_syscalls() -> List[Check]:
         check_mipster_execution('test3.c', 6,
                                 'Count called syscalls for binary search') 
 
+def check_semaphores() -> List[Check]:
+	return check_execution('./selfie -c <assignment>mutual-exclusion.c -m 128',
+							'Writes happen sequentially',
+                            success_criteria='Hello World!    ' * 2) + \
+		check_execution('./selfie -c <assignment>producer-consumer.c -m 128',
+							'Producer-Consumer problem works correctly',
+							success_criteria='Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....')
+
+
 assignment_bootstrapping = Assignment('bootstrapping', 'General', '', '', check_bootstrapping)
 assignment_self_compile = Assignment('self-compile', 'General', '', '', check_self_compilation)
 
@@ -432,6 +441,9 @@ assignment_scheduler = Assignment('scheduler', 'Systems', 'scheduler',
 assignment_count_syscalls = Assignment('count-syscalls', 'Systems', 'count-syscalls',
             REPO_BLOB_BASE_URI + 'grader/systems-assignmens.md#assignment-count-syscalls',
             check_count_syscalls)
+assignment_semaphores = Assignment('semaphores', 'Systems', 'semaphores',
+            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-semaphores',
+            check_semaphores, parent = assignment_fork_and_wait)
 
 assignments: List[Assignment] = [
     assignment_print_your_name,
@@ -457,7 +469,8 @@ assignments: List[Assignment] = [
     assignment_treiber_stack,
     assignment_scheduler,
     assignment_count_syscalls,
-    assignment_fork
+    assignment_fork,
+    assignment_semaphores
 ]
 
 

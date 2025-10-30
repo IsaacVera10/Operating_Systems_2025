@@ -1301,6 +1301,14 @@ void implement_count_syscalls(uint64_t *context); // count_syscall
 void emit_fork(); // fork
 void implement_fork(uint64_t *context); // fork
 
+void emit_sem_init(); // Semaphores
+void emit_sem_wait();
+void emit_sem_post();
+
+void implement_sem_init(uint64_t *context); // Semaphores
+void implement_sem_wait(uint64_t *context);
+void implement_sem_post(uint64_t *context);
+
 void emit_open();
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s);
 void implement_openat(uint64_t *context);
@@ -1327,6 +1335,10 @@ uint64_t SYSCALL_BRK = 214;
 uint64_t SYSCALL_DUMMY = 1;           // dummy_syscall
 uint64_t SYSCALL_COUNT_SYSCALLS = 2; // count_syscall
 uint64_t SYSCALL_FORK = 3;            // fork
+
+uint64_t SYSCALL_SEM_INIT = 215;    // Semaphores
+uint64_t SYSCALL_SEM_WAIT = 216;
+uint64_t SYSCALL_SEM_POST = 217;
 
 /* DIRFD_AT_FDCWD corresponds to AT_FDCWD in fcntl.h and
    is passed as first argument of the openat system call
@@ -2215,6 +2227,7 @@ uint64_t *new_context();
 void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt);
 
 uint64_t *find_context(uint64_t *parent, uint64_t *vctxt);
+uint64_t *find_context_by_id(uint64_t id); // Semaphores
 
 void free_context(uint64_t *context);
 uint64_t *delete_context(uint64_t *context, uint64_t *from);
@@ -2257,13 +2270,14 @@ uint64_t *delete_context(uint64_t *context, uint64_t *from);
 // | 31 | gc enabled      | flag indicating whether to use gc or not
 // +----+-----------------+
 // | 32 | id_context      | context id for fork
-// | 33 | ptr_parent_ctx | pointer to parent context for fork
+// | 33 | ptr_parent_ctx  | pointer to parent context for fork
+// | 34 | blocked         | flag indicating whether context is blocked
 // +----+-----------------+
 
 // number of entries of a machine context:
 // 14 uint64_t + 6 uint64_t* + 1 char* + 7 uint64_t + 2 uint64_t* + 2 uint64_t entries
 // extended in the symbolic execution engine and the Boehm garbage collector
-uint64_t CONTEXTENTRIES = 34;
+uint64_t CONTEXTENTRIES = 35;
 
 uint64_t *allocate_context(); // declaration avoids warning in the Boehm garbage collector
 
@@ -2309,6 +2323,7 @@ uint64_t gcs_in_period(uint64_t *context) { return (uint64_t)(context + 30); }
 uint64_t use_gc_kernel(uint64_t *context) { return (uint64_t)(context + 31); }
 uint64_t id_context(uint64_t* context) { return (uint64_t)(context + 32); } // fork
 uint64_t ptr_parent_ctx(uint64_t* context) { return (uint64_t)(context + 33); } // fork
+uint64_t blocked(uint64_t* context) { return (uint64_t)(context + 34); } // semaphores
 
 uint64_t *get_next_context(uint64_t *context) { return (uint64_t *)*context; }
 uint64_t *get_prev_context(uint64_t *context) { return (uint64_t *)*(context + 1); }
@@ -2346,6 +2361,7 @@ uint64_t get_gcs_in_period(uint64_t *context) { return *(context + 30); }
 uint64_t get_use_gc_kernel(uint64_t *context) { return *(context + 31); }
 uint64_t get_id_context(uint64_t *context) { return *(context + 32); } // fork
 uint64_t* get_ptr_parent_ctx(uint64_t *context) { return (uint64_t*)*(context + 33); } // fork
+uint64_t get_blocked(uint64_t *context) { return *(context + 34); } // semaphores
 
 void set_next_context(uint64_t *context, uint64_t *next) { *context = (uint64_t)next; }
 void set_prev_context(uint64_t *context, uint64_t *prev) { *(context + 1) = (uint64_t)prev; }
@@ -2383,6 +2399,25 @@ void set_gcs_in_period(uint64_t *context, uint64_t gcs) { *(context + 30) = gcs;
 void set_use_gc_kernel(uint64_t *context, uint64_t use) { *(context + 31) = use; }
 void set_id_context(uint64_t *context, uint64_t pid) { *(context + 32) = pid; } // fork
 void set_ptr_parent_ctx(uint64_t *context, uint64_t* pctx) { *(context + 33) = (uint64_t)pctx; } // fork
+void set_blocked(uint64_t *context, uint64_t block) { *(context + 34) = block; } // semaphores
+
+// semaphore
+// +---+--------------------+
+// | 0 | value				| semaphore counter value
+// | 1 | n_waiters			| amount of current waiters
+// | 2 | waiters			| array of waiters
+// +---+--------------------+
+
+uint64_t SEMAPHOREENTRIES = 3;
+
+uint64_t get_sem_value(uint64_t *sem) { return *(sem); }
+uint64_t get_sem_n_waiters(uint64_t *sem) { return *(sem + 1); }
+uint64_t *get_sem_waiters(uint64_t *sem) { return (uint64_t *) *(sem + 2); }
+
+void set_sem_value(uint64_t *sem, uint64_t value) { *(sem) = value; }
+void set_sem_n_waiters(uint64_t *sem, uint64_t n_waiters) { *(sem + 1) = n_waiters; }
+void set_sem_waiters (uint64_t *sem, uint64_t *waiters) { *(sem + 2) = (uint64_t) waiters; }
+
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -2394,6 +2429,8 @@ uint64_t *create_context(uint64_t *parent, uint64_t *vctxt);
 uint64_t *cache_context(uint64_t *vctxt);
 
 void save_context(uint64_t *context);
+
+uint64_t create_semaphore(uint64_t value); // Semaphores
 
 uint64_t lowest_page(uint64_t page, uint64_t lo);
 uint64_t highest_page(uint64_t page, uint64_t hi);
@@ -2425,7 +2462,10 @@ uint64_t *current_context = (uint64_t *)0; // context currently running
 uint64_t *used_contexts = (uint64_t *)0; // doubly-linked list of used contexts
 uint64_t *free_contexts = (uint64_t *)0; // singly-linked list of free contexts
 
+uint64_t *used_semaphores = (uint64_t *)0; // Semaphores: Array of used semaphores
+
 uint64_t id_ctxt_counter = 0; // fork
+uint64_t next_sem_id = 0; // Semaphores: Semaphore id counter
 
 // ------------------------- INITIALIZATION ------------------------
 
@@ -6879,8 +6919,13 @@ void selfie_compile()
   emit_open();
   emit_dummy_syscall(); // dummy_syscall
   emit_count_syscalls(); // count_syscall
+
   emit_fork(); // fork
 
+  emit_sem_init(); // semaphores
+  emit_sem_wait();
+  emit_sem_post();
+  
   emit_malloc();
 
   emit_switch();
@@ -8672,6 +8717,143 @@ void implement_fork(uint64_t *context){ // fork
   // 9. seteo parent_context e hijo a listo para correr
   set_ptr_parent_ctx(child_context, context);
 
+}
+
+void emit_sem_init(){ // Semaphores: sem_init
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("sem_init"),
+                            0, PROCEDURE, VOID_T, 2, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // pointer to semaphore
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A1, REG_SP, 0); // initial value
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_SEM_INIT);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_sem_init (uint64_t *context) { // Semaphores: sem_init
+  uint64_t sem_id_addr;
+  uint64_t sem_initial_value;
+  uint64_t sem_id;
+
+  sem_id_addr = *(get_regs (context) + REG_A0);
+  sem_initial_value = *(get_regs (context) + REG_A1);
+
+  sem_id = create_semaphore (sem_initial_value);
+
+  map_and_store (context, sem_id_addr, sem_id);
+
+  set_pc (context, get_pc (context) + INSTRUCTIONSIZE);
+}
+
+void emit_sem_wait(){// Semaphores: sem_wait
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("sem_wait"),
+                            0, PROCEDURE, VOID_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // pointer to semaphore
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_SEM_WAIT);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_sem_wait(uint64_t *context) {
+  uint64_t sem_addr;
+  uint64_t sem_id;
+  uint64_t* sem;
+  uint64_t* sem_waiters;
+  uint64_t sem_value;
+  uint64_t sem_n_waiters;
+
+  // --- Access semaphore structure ---
+  sem_addr = *(get_regs(context) + REG_A0);
+  sem_id = load_virtual_memory(get_pt(context), sem_addr);
+  sem = used_semaphores + (sem_id * SEMAPHOREENTRIES);
+
+  sem_value = get_sem_value(sem);
+  sem_n_waiters = get_sem_n_waiters(sem);
+  sem_waiters = get_sem_waiters(sem);
+
+  // --- Case 1: semaphore available ---
+  if (sem_value > 0) {
+    set_sem_value(sem, sem_value - 1);
+  }
+  // --- Case 2: semaphore unavailable ---
+  else {
+    set_blocked(context, 1);
+
+    if (sem_n_waiters < 64) {
+      *(sem_waiters + sem_n_waiters) = get_id_context(context);
+      set_sem_n_waiters(sem, sem_n_waiters + 1);
+    } else {
+      printf("WARNING: semaphore waiters overflow!\n");
+    }
+  }
+
+  // --- Always advance program counter ---
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+void emit_sem_post() {// Semaphores: sem_post
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("sem_post"),
+                            0, PROCEDURE, VOID_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // pointer to semaphore
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_SEM_WAIT);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_sem_post(uint64_t *context) {
+  uint64_t sem_addr;
+  uint64_t sem_id;
+  uint64_t *sem;
+  uint64_t *sem_waiters;
+  uint64_t sem_value;
+  uint64_t sem_n_waiters;
+  uint64_t waiter_pid;
+  uint64_t iter;
+
+  sem_addr = *(get_regs(context) + REG_A0);
+  sem_id = load_virtual_memory(get_pt(context), sem_addr);
+  sem = used_semaphores + (sem_id * SEMAPHOREENTRIES);
+
+  sem_value = get_sem_value(sem);
+  sem_n_waiters = get_sem_n_waiters(sem);
+  sem_waiters = get_sem_waiters(sem);
+
+  if (sem_n_waiters > 0) {
+    // Wake up first waiting process
+    waiter_pid = *(sem_waiters + 0); // el último agregado
+    set_blocked(find_context_by_id(waiter_pid), 0);
+
+    // Desplazar la cola manualmente
+    
+    iter = 0;
+    while (iter < sem_n_waiters - 1) {
+      *(sem_waiters + iter) = *(sem_waiters + iter + 1);
+      iter = iter + 1;
+    }
+
+    set_sem_n_waiters(sem, sem_n_waiters - 1);
+  } else {
+    // No waiters: increase available resources
+    set_sem_value(sem, sem_value + 1);
+  }
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 }
 
 uint64_t down_load_string(uint64_t *context, uint64_t vstring, char *s)
@@ -11097,16 +11279,21 @@ void do_ecall()
     read_register(REG_A0);
     if (a7 != SYSCALL_EXIT)
     {
-      if (a7 != SYSCALL_FORK){
-        if (a7 != SYSCALL_COUNT_SYSCALLS){
-          if (a7 != SYSCALL_DUMMY){
-            if (a7 != SYSCALL_BRK){
+      if (a7 == SYSCALL_SEM_INIT) read_register(REG_A1);
+      else{
+        if (a7!= SYSCALL_SEM_WAIT){
+          if (a7 != SYSCALL_SEM_POST){
+            if (a7 != SYSCALL_FORK){
+              if (a7 != SYSCALL_COUNT_SYSCALLS){
+                if (a7 != SYSCALL_DUMMY){
+                  if (a7 != SYSCALL_BRK){
+                        read_register(REG_A1);
+                        read_register(REG_A2);
 
-              read_register(REG_A1);
-              read_register(REG_A2);
-
-              if (a7 == SYSCALL_OPENAT)
-                read_register(REG_A3);
+                      if (a7 == SYSCALL_OPENAT) read_register(REG_A3);
+                  }
+                }
+              }
             }
           }
         }
@@ -12298,6 +12485,21 @@ uint64_t *find_context(uint64_t *parent, uint64_t *vctxt)
   return (uint64_t *)0;
 }
 
+uint64_t *find_context_by_id (uint64_t id) {// Semaphores
+	uint64_t *cur;
+
+	cur = used_contexts;
+	while (cur != (uint64_t *) 0) {
+		if (get_id_context (cur) == id){
+			return cur;
+		}
+
+		cur = get_next_context(cur);
+	}
+
+	return (uint64_t *) 0;
+}
+
 void free_context(uint64_t *context)
 {
   set_next_context(context, free_contexts);
@@ -12407,6 +12609,28 @@ void save_context(uint64_t *context)
   if (*(get_regs(context) + REG_SP) < get_mc_stack_peak(context))
     // keep track of peak amount of stack allocation
     set_mc_stack_peak(context, *(get_regs(context) + REG_SP));
+}
+
+uint64_t create_semaphore (uint64_t value) { // Semaphores
+	uint64_t *sem;
+	uint64_t sem_id;
+  uint64_t i;
+
+	sem_id = next_sem_id;
+	next_sem_id = next_sem_id + 1;
+	sem = used_semaphores + (sem_id * SEMAPHOREENTRIES);
+
+	set_sem_value (sem, value);
+	set_sem_n_waiters (sem, 0);
+	set_sem_waiters (sem, smalloc (sizeof (uint64_t) * 64)); // At most 64 waiters
+
+	i = 0;
+	while (i < 64) {
+      *(get_sem_waiters (sem) + i) = -1;
+	  i = i + 1;
+	}
+
+	return sem_id;
 }
 
 uint64_t lowest_page(uint64_t page, uint64_t lo)
@@ -12912,6 +13136,12 @@ uint64_t handle_system_call(uint64_t *context)
     implement_count_syscalls(context);
   else if (a7 == SYSCALL_FORK)
     implement_fork(context); // fork
+  else if (a7 == SYSCALL_SEM_INIT) // Semaphores
+    implement_sem_init (context);
+  else if (a7 == SYSCALL_SEM_WAIT) // Semaphores
+    implement_sem_wait (context);
+  else if (a7 == SYSCALL_SEM_POST) // Semaphores
+    implement_sem_post (context);
   else if (a7 == SYSCALL_EXIT)
   {
     implement_exit(context);
@@ -13042,6 +13272,13 @@ uint64_t mipster(uint64_t *to_context)
       to_context = get_next_context(from_context);
       if (to_context == (uint64_t *)0)
         to_context = used_contexts;
+
+      while (get_blocked(to_context) == 1) {	// semaphores: Skip blocked contexts
+		    to_context = get_next_context (to_context);
+
+	      if (to_context == (uint64_t *)0)
+    	    to_context = used_contexts;
+	  	}
 
       timeout = TIMESLICE;
     }
@@ -13403,6 +13640,9 @@ uint64_t selfie_run(uint64_t machine)
   // current_context is ready to run
 
   run = 1;
+
+  used_semaphores = smalloc (sizeof (uint64_t) * SEMAPHOREENTRIES * 512); // semaphores: initialize semaphore table
+
 
   printf("%s: %lu-bit %s executing %lu-bit RISC-U binary %s with %luMB physical memory", selfie_name,
          SIZEOFUINT64INBITS,
