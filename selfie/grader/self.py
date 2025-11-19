@@ -356,8 +356,11 @@ def check_semaphores() -> List[Check]:
                             success_criteria='Hello World!    ' * 2) + \
 		check_execution('./selfie -c <assignment>producer-consumer.c -m 128',
 							'Producer-Consumer problem works correctly',
-							success_criteria='Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....')
-
+							success_criteria='Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....Prod....Cons....')
+def check_page_replacement() -> List[Check]:
+	return check_execution('./selfie -c <assignment>unhandled-page-fault.c -m 1',
+							'Pages are replaced when no frames are available',
+							success_criteria=0)
 
 assignment_bootstrapping = Assignment('bootstrapping', 'General', '', '', check_bootstrapping)
 assignment_self_compile = Assignment('self-compile', 'General', '', '', check_self_compilation)
@@ -444,6 +447,9 @@ assignment_count_syscalls = Assignment('count-syscalls', 'Systems', 'count-sysca
 assignment_semaphores = Assignment('semaphores', 'Systems', 'semaphores',
             REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-semaphores',
             check_semaphores, parent = assignment_fork_and_wait)
+assignment_page_replacement = Assignment('page-replacement', 'Systems', 'page-replacement',
+			REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-page-replacement',
+			check_page_replacement)
 
 assignments: List[Assignment] = [
     assignment_print_your_name,
@@ -470,7 +476,8 @@ assignments: List[Assignment] = [
     assignment_scheduler,
     assignment_count_syscalls,
     assignment_fork,
-    assignment_semaphores
+    assignment_semaphores,
+    assignment_page_replacement
 ]
 
 
