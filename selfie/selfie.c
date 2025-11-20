@@ -2473,8 +2473,8 @@ void reset_microkernel()
 {
   current_context = (uint64_t *)0;
 
-  used_semaphores = zmalloc(64 * SEMAPHOREENTRIES * sizeof(uint64_t));
-  next_sem_id = 0;
+  // used_semaphores = zmalloc(64 * SEMAPHOREENTRIES * sizeof(uint64_t)); // semaphores
+  // next_sem_id = 0;
 
   while (used_contexts != (uint64_t *)0)
     used_contexts = delete_context(used_contexts, used_contexts);
@@ -8796,6 +8796,10 @@ void implement_sem_wait(uint64_t* context) {
     set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
   } else {
     // Caso 2: no hay recursos → bloquear
+
+    set_blocked(context, 1);
+   //  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
     if (n < 64) {
       if (waiters != (uint64_t*)0) {
         pid = get_id_context(context);
@@ -8803,8 +8807,6 @@ void implement_sem_wait(uint64_t* context) {
         set_sem_n_waiters(sem, n + 1);
       }
     }
-
-    set_blocked(context, 1);
     // No se incrementa PC → se reintentará al despertar
   }
 }
@@ -8829,10 +8831,12 @@ void implement_sem_post(uint64_t* context) {
   uint64_t sem_addr;
   uint64_t sem_id;
   uint64_t* sem;
+
   uint64_t n;
   uint64_t* waiters;
   uint64_t waiter_pid;
   uint64_t* waiter_ctx;
+  uint64_t i;
 
   sem_addr = *(get_regs(context) + REG_A0);
   sem_id   = load_virtual_memory(get_pt(context), sem_addr);
@@ -8841,33 +8845,33 @@ void implement_sem_post(uint64_t* context) {
   n = get_sem_n_waiters(sem);
   waiters = get_sem_waiters(sem);
 
+  set_sem_value(sem, get_sem_value(sem) + 1);
+
   if (n > 0) {
-    if (waiters != (uint64_t*)0) {
-      // Hay procesos esperando: incrementar semáforo y despertar al primero
-      set_sem_value(sem, get_sem_value(sem) + 1);
+   //  set_sem_value(sem, get_sem_value(sem) + 1);
     
-    // Despertar al último proceso (LIFO)
-    n = n - 1;
-    waiter_pid = *(waiters + n);
-    *(waiters + n) = (uint64_t)-1;
-    set_sem_n_waiters(sem, n);
+    // Hay procesos esperando → no incrementamos value
+    waiter_pid = *waiters;
+
+    // Desplazamos hacia  la izquierda la lista de waiters
+    i = 0; 
+    while (i < n - 1) { 
+      *(waiters + i) = *(waiters + i + 1); 
+      i = i + 1; 
+    }
+    
+    *(waiters + n - 1) = -1;
+    set_sem_n_waiters(sem, n - 1);
 
     waiter_ctx = find_context_by_id(waiter_pid);
+    if (waiter_ctx != (uint64_t*)0)
+      set_blocked(waiter_ctx, 0);
 
-      if (waiter_ctx != (uint64_t*)0) {
-        // Marca el contexto como listo (NO avanzamos el PC)
-        // El proceso volverá a ejecutar sem_wait y adquirirá el recurso
-        set_blocked(waiter_ctx, 0);
-      } else {
-        // Si no se encontró el proceso, el recurso ya está disponible
-        // (el valor ya fue incrementado arriba)
-      }
-    }
-  } else {
-    // Nadie esperando → solo liberar el recurso
-    set_sem_value(sem, get_sem_value(sem) + 1);
-  }  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+  }
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 }
+
 
 
 
@@ -13293,17 +13297,17 @@ uint64_t mipster(uint64_t *to_context)
       if (to_context == (uint64_t *)0)
         to_context = used_contexts;
 
-      // Skip blocked (1) or exited (2) contexts
       start_ctx = to_context;
-      while (get_blocked(to_context) >= 1) {
+
+      while (get_blocked(to_context) >= 1) { // Bloqueado o terminado/zombie/no ruannable
         to_context = get_next_context(to_context);
-        if (to_context == (uint64_t *)0)
+        if (to_context == (uint64_t *)0)//Si llegamos a null, volvemos al inicio de la lista
           to_context = used_contexts;
         
-        // Check if we've looped back - all contexts blocked/exited
-        if (to_context == start_ctx) {
-          // Check if all contexts have exited
+        
+        if (to_context == start_ctx) { // Hicimos un recorridos circular y todos los procesos están terminados o estado no runnable
           all_done = 1;
+          
           while (to_context != (uint64_t *)0) {
             if (get_blocked(to_context) != 2) {
               all_done = 0;

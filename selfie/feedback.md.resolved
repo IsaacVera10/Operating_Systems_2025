@@ -1,0 +1,57 @@
+# Feedback sobre la implementación de Semáforos en Selfie
+
+He analizado tu implementación de semáforos en [selfie.c](file:///home/isaac/UTEC/Operating_Systems_2025/selfie/selfie.c) y los tests en `grader/assignments/semaphores/`. Aquí tienes mis comentarios y sugerencias:
+
+## 1. Comportamiento LIFO vs FIFO
+Tu implementación actual de `sem_post` utiliza una política **LIFO (Last-In, First-Out)** para despertar a los procesos:
+```c
+// implement_sem_post
+n = n - 1;
+waiter_pid = *(waiters + n); // Toma el último que entró
+```
+Mientras que `sem_wait` agrega al final:
+```c
+// implement_sem_wait
+*(waiters + n) = pid; // Agrega al final
+```
+Esto crea una pila (stack). Aunque esto funciona para exclusión mutua simple y sincronización básica (como en tus tests actuales), los semáforos tradicionalmente utilizan **FIFO (First-In, First-Out)** para garantizar equidad y evitar la inanición (starvation). Si tienes múltiples productores o consumidores esperando, el último que llegó será el primero en ser atendido, lo cual podría dejar a los primeros esperando indefinidamente bajo carga alta.
+
+**Sugerencia:** Si deseas un comportamiento más estándar, considera implementar una cola FIFO. Esto requeriría mover los elementos del arreglo o usar un buffer circular/lista enlazada.
+
+## 2. Límite de Procesos en Espera (Bug Potencial)
+Tienes un límite duro de 64 waiters:
+```c
+// implement_sem_wait
+if (n < 64) {
+  // ... agrega a la lista ...
+}
+set_blocked(context, 1);
+```
+Si un 65º proceso intenta esperar:
+1. No se agrega a la lista `waiters`.
+2. Se marca como `blocked`.
+3. **Nunca será despertado**, ya que `sem_post` solo itera sobre la lista `waiters`. Esto causará que el proceso se cuelgue para siempre (deadlock).
+
+**Sugerencia:** Deberías manejar este caso, ya sea aumentando el tamaño, haciendo el arreglo dinámico, o al menos lanzando un error/panic si se excede el límite para evitar un fallo silencioso.
+
+## 3. Semántica de "Retry" y "Barging"
+Tu implementación despierta al proceso (`set_blocked(..., 0)`) pero **no** le asigna el recurso directamente ni avanza su PC. El proceso despertado reintenta ejecutar `sem_wait`.
+```c
+// implement_sem_post
+set_blocked(waiter_ctx, 0); // Solo lo desbloquea
+
+// implement_sem_wait
+// Si no hay recursos, bloquea y NO incrementa PC
+```
+Esto es correcto y robusto (Mesa semantics). Sin embargo, permite "barging": un tercer proceso que llega justo cuando se hace el `post` podría robar el recurso antes de que el proceso despertado tenga oportunidad de correr. Dado que tu implementación es LIFO, esto no empeora mucho la situación, pero es algo a tener en cuenta.
+
+## 4. Correctitud General
+- **Inicialización:** `create_semaphore` inicializa correctamente el valor y la lista de waiters.
+- **Fork:** Dado que `sem_id` es un índice en el arreglo global `used_semaphores` y los procesos hijos heredan la memoria (y por tanto el `sem_id`), los semáforos se comparten correctamente entre padres e hijos.
+- **Tests:** Los tests `mutual-exclusion.c` y `producer-consumer.c` parecen correctos para verificar la funcionalidad básica.
+
+## 5. Estilo
+El código sigue el estilo de `selfie` (uso de `get_regs`, `WORDSIZE`, etc.) y es consistente con el resto del proyecto.
+
+## Resumen
+El código funciona para los casos de prueba provistos. El uso de LIFO es la decisión de diseño más notable; si no es intencional, deberías cambiarlo a FIFO. El bug del límite de 64 waiters es crítico si planeas probar con muchos procesos concurrentes.
