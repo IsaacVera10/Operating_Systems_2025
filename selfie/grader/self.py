@@ -362,6 +362,14 @@ def check_page_replacement() -> List[Check]:
 							'Pages are replaced when no frames are available',
 							success_criteria=0)
 
+def check_semaphore_lock() -> List[Check]:
+	return check_execution('./selfie -c <assignment>mutual-exclusion-sem.c -m 128',
+							'Writes happen sequentially',
+                            success_criteria='Hello World!    ' * 2) + \
+		check_execution('./selfie -c <assignment>mutual-exclusion-lock.c -m 128',
+							'Writes happen sequentially',
+							success_criteria='Hello World!    ' * 2)
+
 assignment_bootstrapping = Assignment('bootstrapping', 'General', '', '', check_bootstrapping)
 assignment_self_compile = Assignment('self-compile', 'General', '', '', check_self_compilation)
 
@@ -451,6 +459,10 @@ assignment_page_replacement = Assignment('page-replacement', 'Systems', 'page-re
 			REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-page-replacement',
 			check_page_replacement)
 
+assignment_semaphore_lock = Assignment('semaphore-lock', 'Systems', 'semaphore-lock',
+            REPO_BLOB_BASE_URI + 'grader/systems-assignments.md#assignment-semaphore-lock',
+            check_semaphore_lock, parent = assignment_fork_and_wait)
+
 assignments: List[Assignment] = [
     assignment_print_your_name,
     assignment_hex_literal,
@@ -477,7 +489,8 @@ assignments: List[Assignment] = [
     assignment_count_syscalls,
     assignment_fork,
     assignment_semaphores,
-    assignment_page_replacement
+    assignment_page_replacement,
+    assignment_semaphore_lock
 ]
 
 
