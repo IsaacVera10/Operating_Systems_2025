@@ -2049,6 +2049,16 @@ uint64_t TIMESLICE = 100000;
 
 uint64_t TIMEROFF = 0; // must be 0 to turn off timer interrupt
 
+// Scheduler type selection
+uint64_t SCHEDULER_ROUND_ROBIN = 0;
+uint64_t SCHEDULER_RANDOM = 1;
+uint64_t SCHEDULER_CFS = 2;
+
+uint64_t scheduler_type = 0; // default: round-robin (SCHEDULER_ROUND_ROBIN)
+uint64_t random_seed = 12345; // seed for random number generator
+
+uint64_t debug_scheduler = 0; // flag for debugging scheduler decisions
+
 // ------------------------ GLOBAL VARIABLES -----------------------
 
 // hardware thread state
@@ -2377,6 +2387,7 @@ uint64_t get_use_gc_kernel(uint64_t *context) { return *(context + 31); }
 uint64_t get_id_context(uint64_t *context) { return *(context + 32); } // fork
 uint64_t* get_ptr_parent_ctx(uint64_t *context) { return (uint64_t*)*(context + 33); } // fork
 uint64_t get_blocked(uint64_t *context) { return *(context + 34); } // semaphores
+uint64_t get_vruntime(uint64_t *context) { return *(context + 35); } // CFS scheduler
 
 void set_next_context(uint64_t *context, uint64_t *next) { *context = (uint64_t)next; }
 void set_prev_context(uint64_t *context, uint64_t *prev) { *(context + 1) = (uint64_t)prev; }
@@ -2415,6 +2426,7 @@ void set_use_gc_kernel(uint64_t *context, uint64_t use) { *(context + 31) = use;
 void set_id_context(uint64_t *context, uint64_t pid) { *(context + 32) = pid; } // fork
 void set_ptr_parent_ctx(uint64_t *context, uint64_t* pctx) { *(context + 33) = (uint64_t)pctx; } // fork
 void set_blocked(uint64_t *context, uint64_t block) { *(context + 34) = block; } // semaphores
+void set_vruntime(uint64_t *context, uint64_t vruntime) { *(context + 35) = vruntime; } // CFS scheduler
 
 // semaphore_struct
 // +---+--------------------+
@@ -9317,6 +9329,13 @@ void implement_fork(uint64_t *context){ // fork
 
   // 9. seteo parent_context e hijo a listo para correr
   set_ptr_parent_ctx(child_context, context);
+  
+  // CFS: copiar vruntime del padre al hijo
+  set_vruntime(child_context, get_vruntime(context));
+
+  if (debug_scheduler)
+    printf("[FORK] Parent PID=%lu created child PID=%lu\n", 
+           get_id_context(context), get_id_context(child_context));
 
 }
 
@@ -13255,6 +13274,7 @@ void init_context(uint64_t *context, uint64_t *parent, uint64_t *vctxt)
   id_ctxt_counter = id_ctxt_counter + 1;
 
   set_ptr_parent_ctx(context, (uint64_t *)0); // fork: seteamos el parent_context a null
+  set_vruntime(context, 0); // CFS: inicializar vruntime a 0
 }
 
 uint64_t *find_context(uint64_t *parent, uint64_t *vctxt)
@@ -14040,6 +14060,92 @@ uint64_t handle_timer(uint64_t *context)
   return DONOTEXIT;
 }
 
+// -------------------------------------------------------------------------
+// ------------------------- SCHEDULER FUNCTIONS ---------------------------
+// -------------------------------------------------------------------------
+
+// Simple pseudo-random number generator (Linear Congruential Generator)
+uint64_t simple_rand() {
+  uint64_t temp;
+  
+  temp = random_seed * 1103515245;
+  temp = temp + 12345;
+  random_seed = temp % 2147483648; // 0x7FFFFFFF + 1
+  
+  return random_seed;
+}
+
+// Count runnable contexts in the used_contexts list
+uint64_t count_runnable_contexts() {
+  uint64_t *context;
+  uint64_t count;
+
+  context = used_contexts;
+  count = 0;
+
+  while (context != (uint64_t *)0) {
+    if (get_blocked(context) == 0)
+      count = count + 1;
+    
+    context = get_next_context(context);
+  }
+
+  return count;
+}
+
+// Select a random runnable context from the list
+uint64_t *select_random_context() {
+  uint64_t num_runnable;
+  uint64_t random_index;
+  uint64_t *context;
+  uint64_t i;
+
+  num_runnable = count_runnable_contexts();
+
+  if (num_runnable == 0)
+    return (uint64_t *)0;
+
+  random_index = simple_rand();
+  random_index = random_index % num_runnable;
+
+  context = used_contexts;
+  i = 0;
+
+  while (context != (uint64_t *)0) {
+    if (get_blocked(context) == 0) {
+      if (i == random_index)
+        return context;
+      i = i + 1;
+    }
+    context = get_next_context(context);
+  }
+
+  return (uint64_t *)0;
+}
+
+// Select context with minimum vruntime (Completely Fair Scheduler)
+uint64_t *select_cfs_context() {
+  uint64_t *context;
+  uint64_t *min_context;
+  uint64_t min_vruntime;
+
+  context = used_contexts;
+  min_context = (uint64_t *)0;
+  min_vruntime = UINT64_MAX;
+
+  while (context != (uint64_t *)0) {
+    if (get_blocked(context) == 0) {
+      if (get_vruntime(context) < min_vruntime) {
+        min_vruntime = get_vruntime(context);
+        min_context = context;
+      }
+    }
+    context = get_next_context(context);
+  }
+
+  return min_context;
+}
+
 uint64_t handle_exception(uint64_t *context)
 {
   uint64_t exception;
@@ -14090,20 +14196,20 @@ uint64_t mipster(uint64_t *to_context)
       return get_exit_code(from_context);
     else
     {
-      to_context = get_next_context(from_context);
-      if (to_context == (uint64_t *)0)
-        to_context = used_contexts;
-
-      start_ctx = to_context;
-
-      while (get_blocked(to_context) >= 1) { // Bloqueado o terminado/zombie/no ruannable
-        to_context = get_next_context(to_context);
-        if (to_context == (uint64_t *)0)//Si llegamos a null, volvemos al inicio de la lista
-          to_context = used_contexts;
+      // Scheduler selection
+      if (scheduler_type == SCHEDULER_RANDOM) {
+        // Random Scheduler
+        to_context = select_random_context();
         
+        if (debug_scheduler) {
+          if (to_context != (uint64_t *)0)
+            printf("[SCHEDULER] Random: selecting process PID=%lu\n", get_id_context(to_context));
+        }
         
-        if (to_context == start_ctx) { // Hicimos un recorridos circular y todos los procesos están terminados o estado no runnable
+        if (to_context == (uint64_t *)0) {
+          // No runnable contexts, check if all are terminated
           all_done = 1;
+          to_context = used_contexts;
           
           while (to_context != (uint64_t *)0) {
             if (get_blocked(to_context) != 2) {
@@ -14117,8 +14223,82 @@ uint64_t mipster(uint64_t *to_context)
           if (all_done)
             return EXITCODE_NOERROR;
           else
-            to_context = start_ctx; // deadlock, but continue
+            to_context = used_contexts; // deadlock, but continue
         }
+      } else if (scheduler_type == SCHEDULER_CFS) {
+        // Completely Fair Scheduler (CFS)
+        to_context = select_cfs_context();
+        
+        if (debug_scheduler) {
+          if (to_context != (uint64_t *)0)
+            printf("[SCHEDULER] CFS: selecting process PID=%lu with vruntime=%lu\n", 
+                   get_id_context(to_context), get_vruntime(to_context));
+        }
+        
+        if (to_context == (uint64_t *)0) {
+          // No runnable contexts, check if all are terminated
+          all_done = 1;
+          to_context = used_contexts;
+          
+          while (to_context != (uint64_t *)0) {
+            if (get_blocked(to_context) != 2) {
+              all_done = 0;
+              to_context = (uint64_t *)0; // break
+            } else {
+              to_context = get_next_context(to_context);
+            }
+          }
+          
+          if (all_done)
+            return EXITCODE_NOERROR;
+          else
+            to_context = used_contexts; // deadlock, but continue
+        }
+      } else {
+        // Round-Robin Scheduler (default)
+        to_context = get_next_context(from_context);
+        if (to_context == (uint64_t *)0)
+          to_context = used_contexts;
+
+        start_ctx = to_context;
+
+        while (get_blocked(to_context) >= 1) { // Bloqueado o terminado/zombie/no ruannable
+          to_context = get_next_context(to_context);
+          if (to_context == (uint64_t *)0)//Si llegamos a null, volvemos al inicio de la lista
+            to_context = used_contexts;
+          
+          
+          if (to_context == start_ctx) { // Hicimos un recorridos circular y todos los procesos están terminados o estado no runnable
+            all_done = 1;
+            
+            while (to_context != (uint64_t *)0) {
+              if (get_blocked(to_context) != 2) {
+                all_done = 0;
+                to_context = (uint64_t *)0; // break
+              } else {
+                to_context = get_next_context(to_context);
+              }
+            }
+            
+            if (all_done)
+              return EXITCODE_NOERROR;
+            else
+              to_context = start_ctx; // deadlock, but continue
+          }
+        }
+        
+        if (debug_scheduler)
+          printf("[SCHEDULER] Round-Robin: switching from PID=%lu to PID=%lu\n", 
+                 get_id_context(from_context), get_id_context(to_context));
+      }
+
+      // Update vruntime for CFS (increment by TIMESLICE)
+      if (scheduler_type == SCHEDULER_CFS) {
+        set_vruntime(from_context, get_vruntime(from_context) + TIMESLICE);
+        
+        if (debug_scheduler)
+          printf("[SCHEDULER] CFS: updated PID=%lu vruntime to %lu\n", 
+                 get_id_context(from_context), get_vruntime(from_context));
       }
 
       timeout = TIMESLICE;
@@ -14740,7 +14920,7 @@ uint64_t no_or_bad_or_more_arguments(uint64_t exit_code)
 
 void print_synopsis(char *extras)
 {
-  printf("%s { -c { source } | -o binary | ( -s | -S ) assembly | -l binary }%s\n", selfie_name, extras);
+  printf("%s: usage: selfie [ -scheduler { rr | random | cfs } ] { -c { source } | -o binary | ( -s | -S ) assembly | -l binary }%s\n", selfie_name, extras);
 }
 
 // -----------------------------------------------------------------
@@ -14865,6 +15045,29 @@ void experimental_features()
   else if (string_compare(argument, "-nr"))
   {
     GC_REUSE = GC_DISABLED;
+
+    get_argument();
+  }
+  else if (string_compare(argument, "-scheduler")) // scheduler
+  {
+    get_argument();
+    
+    if (string_compare(argument, "rr"))
+      scheduler_type = SCHEDULER_ROUND_ROBIN;
+    else if (string_compare(argument, "random"))
+      scheduler_type = SCHEDULER_RANDOM;
+    else if (string_compare(argument, "cfs"))
+      scheduler_type = SCHEDULER_CFS;
+    else {
+      printf("%s: unknown scheduler type '%s', using round-robin\n", selfie_name, argument);
+      scheduler_type = SCHEDULER_ROUND_ROBIN;
+    }
+
+    get_argument();
+  }
+  else if (string_compare(argument, "-debug-scheduler"))
+  {
+    debug_scheduler = 1;
 
     get_argument();
   }
